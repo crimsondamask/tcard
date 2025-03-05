@@ -1,15 +1,15 @@
+use rusqlite::Connection;
 use std::sync::Arc;
 
 use egui::{
-    style::Selection, Color32, CornerRadius, Label, Pos2, Rect, RichText, Rounding, Stroke,
-    TextEdit, Visuals,
+    style::Selection, Button, Color32, CornerRadius, Label, Pos2, Rect, RichText, Stroke, TextEdit,
+    Visuals,
 };
 use egui_extras::{Column, TableBuilder};
 
 #[derive(serde::Deserialize, serde::Serialize)]
 struct Employee {
-    id: usize,
-    code: String,
+    id: String,
     first_name: String,
     last_name: String,
     department: String,
@@ -151,10 +151,79 @@ impl eframe::App for TemplateApp {
             ui.heading(format!("{}", self.input_result));
 
             ui.horizontal(|ui| {
-                ui.label("Write something: ");
+                ui.label("Type your ID: ");
                 if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
                     if !self.id_input.is_empty() {
                         self.input_result = self.id_input.clone();
+                        self.id_input = "".to_owned();
+                        let conn = Connection::open("employees.db");
+                        if let Ok(conn) = conn {
+                            let res = conn.prepare(
+                                format!(
+                                    "
+                                      SELECT * FROM employees
+                                      WHERE id={}
+                                  ",
+                                    self.input_result
+                                )
+                                .as_str(),
+                            );
+
+                            if let Ok(mut res) = res {
+                                let mut row_count = 0;
+                                let rows = res.query([]);
+                                if let Ok(mut rows) = rows {
+                                    while let Some(row) = rows.next().unwrap() {
+                                        let id = row.get::<_, String>(0).unwrap();
+                                        let first_name = row.get::<_, String>(1).unwrap();
+                                        let last_name = row.get::<_, String>(2).unwrap();
+                                        let department = row.get::<_, String>(3).unwrap();
+                                        let in_base = row.get::<_, usize>(4).unwrap();
+                                        row_count += 1;
+                                        if row_count == 1 {
+                                            // The logic is inverted as a hack
+                                            println!("{in_base}");
+                                            let in_base = match in_base {
+                                                1 => false,
+                                                _ => true,
+                                            };
+                                            let employee = Employee {
+                                                id: id.clone(),
+                                                first_name,
+                                                last_name,
+                                                department,
+                                                in_base,
+                                                last_timestamp: 133,
+                                            };
+                                            self.employee_buffer.push(employee);
+                                            if in_base {
+                                                let res = conn.execute(
+                                                    format!(
+                                                        "UPDATE employees
+                                                    SET in_base=0
+                                                    WHERE id={}",
+                                                        id
+                                                    )
+                                                    .as_str(),
+                                                    (),
+                                                );
+                                            } else {
+                                                let res = conn.execute(
+                                                    format!(
+                                                        "UPDATE employees
+                                                    SET in_base=1
+                                                    WHERE id={}",
+                                                        id
+                                                    )
+                                                    .as_str(),
+                                                    (),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 let edit = TextEdit::singleline(&mut self.id_input).lock_focus(true);
@@ -173,6 +242,8 @@ impl eframe::App for TemplateApp {
                 .resizable(false)
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(Column::exact(100.0))
+                .column(Column::exact(100.0))
+                .column(Column::exact(200.0))
                 .column(Column::exact(200.0))
                 .column(Column::exact(200.0))
                 .column(Column::exact(200.0))
@@ -182,6 +253,9 @@ impl eframe::App for TemplateApp {
 
             table
                 .header(40.0, |mut header| {
+                    header.col(|ui| {
+                        ui.strong("INDEX");
+                    });
                     header.col(|ui| {
                         ui.strong("ID");
                     });
@@ -197,28 +271,60 @@ impl eframe::App for TemplateApp {
                     header.col(|ui| {
                         ui.strong("STATUS");
                     });
+                    header.col(|ui| {
+                        ui.strong("TIMESTAMP");
+                    });
                 })
                 .body(|mut body| {
                     let row_height = 20.0;
-                    let num_rows = 100;
+                    let num_rows = self.employee_buffer.len();
+
                     body.rows(row_height, num_rows, |mut row| {
                         let index = row.index();
+                        let employee = &self.employee_buffer[index];
                         row.col(|ui| {
                             ui.label(format!("{index}"));
                         });
                         row.col(|ui| {
-                            ui.label(format!("ABDELKADER"));
+                            let id = &employee.id;
+                            ui.label(format!("{id}"));
                         });
                         row.col(|ui| {
-                            ui.label(format!("MADOUI"));
+                            let first_name = &employee.first_name;
+                            ui.label(format!("{first_name}"));
                         });
                         row.col(|ui| {
-                            ui.label(format!("DAQ"));
+                            let last_name = &employee.last_name;
+                            ui.label(format!("{last_name}"));
                         });
                         row.col(|ui| {
-                            ui.label(format!("DAQ"));
+                            let department = &employee.department;
+                            ui.label(format!("{department}"));
                         });
-                    });
+                        row.col(|ui| {
+                            //ui.label("IN");
+                            let in_base = &employee.in_base;
+                            if *in_base {
+                                ui.add(
+                                    Button::new("  IN  ")
+                                        .fill(Color32::GREEN)
+                                        .corner_radius(0.0)
+                                        .frame(false),
+                                );
+                            } else {
+                                ui.add(
+                                    Button::new("  OUT  ")
+                                        .fill(Color32::RED)
+                                        .corner_radius(0.0)
+                                        .frame(false),
+                                );
+                            }
+                        });
+                        row.col(|ui| {
+                            let timestamp = &employee.last_timestamp;
+                            ui.label(format!("{timestamp}"));
+                        });
+                    })
                 });
             // ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             //     powered_by_egui_and_eframe(ui);

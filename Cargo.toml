@@ -26,6 +26,7 @@ image = { version = "0.24", features = ["jpeg", "png"] } # Add the types you wan
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 egui_extras = { version = "0.31.1", features = ["all_loaders", "image"] }
+rusqlite = "0.34.0"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
