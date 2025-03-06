@@ -18,7 +18,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "eframe template",
+        "TCARD SYS",
         native_options,
         Box::new(|cc| Ok(Box::new(tcard::TemplateApp::new(cc)))),
     )
