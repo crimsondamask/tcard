@@ -1433,6 +1433,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "expro_access"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossbeam-channel",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "env_logger",
+ "image 0.24.9",
+ "log",
+ "mysql",
+ "serde",
+ "sqlx",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "exr"
 version = "1.73.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4121,26 +4141,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tcard"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "crossbeam-channel",
- "eframe",
- "egui",
- "egui_extras",
- "env_logger",
- "image 0.24.9",
- "log",
- "mysql",
- "serde",
- "sqlx",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

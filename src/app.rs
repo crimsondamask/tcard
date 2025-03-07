@@ -5,11 +5,12 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use mysql::prelude::*;
 use mysql::*;
 //use sqlx::mysql::MySqlPool;
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use chrono::{DateTime, NaiveDateTime};
 use egui::{
-    style::Selection, Button, Color32, CornerRadius, Label, Pos2, Rect, RichText, Stroke, TextEdit, Vec2, Visuals
+    style::Selection, Button, Color32, CornerRadius, Label, Pos2, Rect, RichText, Stroke, TextEdit,
+    Vec2, Visuals,
 };
 use egui_extras::{Column, TableBuilder};
 
@@ -18,19 +19,39 @@ struct CheckError {
     is_error: bool,
     err_msg: String,
 }
-#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash , Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 struct Employee {
     id: String,
-    first_name: String,
-    last_name: String,
+    name: String,
     department: String,
+    title: String,
+    expro_id: String,
+    field: String,
+    category: String,
     in_base: usize,
     last_timestamp: usize,
+}
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct Emergency {
+    on_base_total: usize,
+    on_base_list: Vec<Employee>,
+    count_list: Vec<Employee>,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    missing_list: Vec<Employee>,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    all_employees_hash: HashSet<Employee>,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    present_employees_hash: HashSet<Employee>
 }
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     // Example stuff:
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    reset_pressed: bool,
+    emergency: Emergency,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    emergency_base_count: usize,
     #[serde(skip)] // This how you opt-out of serialization of a field
     about_show: bool,
     #[serde(skip)] // This how you opt-out of serialization of a field
@@ -52,6 +73,7 @@ pub struct TemplateApp {
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
     employee_buffer: Vec<Employee>,
+    emergency_buffer: Vec<Employee>,
     #[serde(skip)] // This how you opt-out of serialization of a field
     id_check: CheckError,
 }
@@ -60,17 +82,28 @@ impl Default for TemplateApp {
     fn default() -> Self {
         Self {
             // Example stuff:
+            reset_pressed: false,
+            emergency: Emergency {
+                on_base_total: 0,
+                on_base_list: Vec::new(),
+                count_list: Vec::new(),
+                missing_list: Vec::new(),
+                all_employees_hash: HashSet::new(),
+                present_employees_hash: HashSet::new(),
+            },
+            emergency_base_count: 0,
             about_show: false,
             locked: true,
             send_channel: None,
             receive_channel: None,
-            db_url: "mysql://root:admin@localhost:3306/employees".to_owned(),
+            db_url: "mysql://root:admin@localhost:3306/expro".to_owned(),
             first_frame: true,
             id_input: "".to_owned(),
             input_result: "".to_owned(),
             is_emergency: false,
             value: 2.7,
             employee_buffer: Vec::new(),
+            emergency_buffer: Vec::new(),
             id_check: CheckError {
                 is_error: false,
                 err_msg: "".to_owned(),
@@ -113,7 +146,7 @@ impl TemplateApp {
         };
 
         visuals.widgets.inactive.weak_bg_fill = Color32::from_rgb(180, 180, 180);
-        visuals.widgets.inactive.bg_fill = Color32::from_rgb(180, 180, 180);
+        visuals.widgets.inactive.bg_fill = Color32::from_rgb(200, 200, 200);
         visuals.widgets.inactive.corner_radius = CornerRadius::ZERO;
         visuals.widgets.noninteractive.corner_radius = CornerRadius::ZERO;
         visuals.widgets.active.corner_radius = CornerRadius::ZERO;
@@ -202,10 +235,13 @@ impl eframe::App for TemplateApp {
             });
         });
 
-        egui::Window::new("About").open(&mut self.about_show).fade_out(true).show(ctx, |ui| {
-           ui.label("Developed by Abdelkader Madoui <abdelkader.madoui@expro.com>.");
-           ui.label("All rights reserved 2025.");
-        });
+        egui::Window::new("About")
+            .open(&mut self.about_show)
+            .fade_out(true)
+            .show(ctx, |ui| {
+                ui.label("Developed by Abdelkader Madoui <abdelkader.madoui@expro.com>.");
+                ui.label("All rights reserved 2025.");
+            });
         egui::CentralPanel::default().show(ctx, |ui| {
             // The central panel the region left after adding TopPanel's and SidePanel's
 
@@ -246,21 +282,24 @@ impl eframe::App for TemplateApp {
                         let pool = Pool::new(self.db_url.as_str());
                         if let Ok(pool) = pool {
                             if let Ok(mut conn) = pool.get_conn() {
-                                println!("Connected");
+                                //println!("Connected");
                                 let res = conn.query_map(
                                     format!(
                                     r#"
-                                        SELECT code, first_name, last_name, department, in_base, timestamp FROM employees
-                                        WHERE code="{}";
+                                        SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                                        WHERE id="{}";
                                     "#,
                                         self.input_result
                                     ),
-                                    |(code, first_name, last_name, department, in_base, last_timestamp)| {
+                                    |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
                                         Employee {
-                                            id: code,
-                                            first_name,
-                                            last_name,
+                                            id,
+                                            name,
                                             department,
+                                            title,
+                                            expro_id,
+                                            field,
+                                            category,
                                             in_base,
                                             last_timestamp
                                         }
@@ -275,61 +314,86 @@ impl eframe::App for TemplateApp {
                                         };
 
                                         let timestamp = chrono::Local::now().to_utc().timestamp();
-                                        let mut employee_status = res[0].clone();
-                                        if employee_status.in_base == 0 {
-                                            let res = conn.exec_drop(
-                                                    format!(
-                                                        "UPDATE employees
-                                                    SET in_base=1, timestamp={}
-                                                    WHERE code={}",
-                                                        timestamp,
-                                                        employee_status.id
-                                                    ),
-                                                    ()
-                                            );
-
-                                            if res.is_ok() {
-                                                println!("{:?}", res);
-                                                
-                                                employee_status.in_base = 1;
-                                                employee_status.last_timestamp = timestamp as usize;
-                                                self.employee_buffer.push(employee_status);
-                                                
-                                            } else {
-                                                self.id_check = CheckError {
-                                                    is_error: true,
-                                                    err_msg: "Could not edit employee status in the DB".to_owned(),
-                                                };
-                                                
+                                        let mut employee_res = res[0].clone();
+                                        if self.is_emergency {
+                                            // We check if the employee has already been counted in the drill.
+                                            let mut exists = false;
+                                            for employee in self.emergency.count_list.iter_mut() {
+                                                if employee.id == employee_res.id { 
+                                                    exists = true; 
+                                                }
                                             }
-                                            
+
+                                            if !exists {
+                                                
+                                                // If the employee has not been counted we push them to the count list.
+                                                //self.emergency.count_list.push(employee_res.clone());
+                                                self.emergency.present_employees_hash.insert(employee_res.clone());
+
+                                            }
+
                                         } else {
-                                            let res = conn.query_drop(
-                                                    format!(
-                                                        "UPDATE employees
-                                                    SET in_base=0, timestamp={}
-                                                    WHERE code={}",
-                                                        timestamp,
-                                                        employee_status.id
-                                                    )
-                                                    
-                                            );
+                                            let duration_since = timestamp - employee_res.last_timestamp as i64;
+                                            if duration_since >= 30 {
+                                                if employee_res.in_base == 0 {
+                                                    let res = conn.exec_drop(
+                                                            format!(
+                                                                "UPDATE expro_employees
+                                                            SET in_base=1, last_timestamp={}
+                                                            WHERE id={}",
+                                                                timestamp,
+                                                                employee_res.id
+                                                            ),
+                                                            ()
+                                                    );
 
-                                            if res.is_ok() {
+                                                    if res.is_ok() {
+                                                        // println!("{:?}", res);
                                                 
-                                                employee_status.in_base = 0;
-                                                employee_status.last_timestamp = timestamp as usize;
-                                                self.employee_buffer.push(employee_status);
+                                                        employee_res.in_base = 1;
+                                                        employee_res.last_timestamp = timestamp as usize;
+                                                        self.employee_buffer.push(employee_res);
                                                 
-                                            } else {
-                                                self.id_check = CheckError {
-                                                    is_error: true,
-                                                    err_msg: "Could not edit employee status in the DB".to_owned(),
-                                                };
+                                                    } else {
+                                                        self.id_check = CheckError {
+                                                            is_error: true,
+                                                            err_msg: "Could not edit employee status in the DB".to_owned(),
+                                                        };
                                                 
-                                            }
+                                                    }
                                             
+                                                } else {
+                                                    let res = conn.query_drop(
+                                                            format!(
+                                                                "UPDATE expro_employees
+                                                            SET in_base=0, last_timestamp={}
+                                                            WHERE id={}",
+                                                                timestamp,
+                                                                employee_res.id
+                                                            )
+                                                    
+                                                    );
+
+                                                    if res.is_ok() {
+                                                
+                                                        employee_res.in_base = 0;
+                                                        employee_res.last_timestamp = timestamp as usize;
+                                                        self.employee_buffer.push(employee_res);
+                                                
+                                                    } else {
+                                                        self.id_check = CheckError {
+                                                            is_error: true,
+                                                            err_msg: "Could not edit employee status in the DB".to_owned(),
+                                                        };
+                                                
+                                                    }
+                                            
+                                                }                                                
+                                            }
+                                                                                        
                                         }
+
+                                        
                                         
                                     } else {
                                         self.id_check = CheckError {
@@ -358,102 +422,6 @@ impl eframe::App for TemplateApp {
                             };
                             
                         }
-                        //let conn = Connection::open("employees.db");
-                        // if let Ok(conn) = conn {
-                        //     let res = conn.prepare(
-                        //         format!(
-                        //             "
-                        //               SELECT * FROM employees
-                        //               WHERE id={}
-                        //           ",
-                        //             self.input_result
-                        //         )
-                        //         .as_str(),
-                        //     );
-
-                        //     if let Ok(mut res) = res {
-                        //         let mut row_count = 0;
-                        //         let rows = res.query([]);
-                        //         if let Ok(mut rows) = rows {
-                        //             while let Some(row) = rows.next().unwrap() {
-                        //                 let id = row.get::<_, String>(0).unwrap();
-                        //                 let first_name = row.get::<_, String>(1).unwrap();
-                        //                 let last_name = row.get::<_, String>(2).unwrap();
-                        //                 let department = row.get::<_, String>(3).unwrap();
-                        //                 let in_base = row.get::<_, usize>(4).unwrap();
-                        //                 row_count += 1;
-                        //                 if row_count == 1 {
-                        //                     self.id_check = CheckError {
-                        //                         is_error: false,
-                        //                         err_msg: "".to_owned(),
-                        //                     };
-                        //                     // The logic is inverted as a hack
-                        //                     println!("{in_base}");
-                        //                     let in_base = match in_base {
-                        //                         1 => false,
-                        //                         _ => true,
-                        //                     };
-                        //                     let employee = Employee {
-                        //                         id: id.clone(),
-                        //                         first_name,
-                        //                         last_name,
-                        //                         department,
-                        //                         in_base,
-                        //                         last_timestamp: 133,
-                        //                     };
-                        //                     self.employee_buffer.push(employee);
-                        //                     if in_base {
-                        //                         let res = conn.execute(
-                        //                             format!(
-                        //                                 "UPDATE employees
-                        //                             SET in_base=1
-                        //                             WHERE id={}",
-                        //                                 id
-                        //                             )
-                        //                             .as_str(),
-                        //                             (),
-                        //                         );
-                        //                     } else {
-                        //                         let res = conn.execute(
-                        //                             format!(
-                        //                                 "UPDATE employees
-                        //                             SET in_base=0
-                        //                             WHERE id={}",
-                        //                                 id
-                        //                             )
-                        //                             .as_str(),
-                        //                             (),
-                        //                         );
-                        //                     }
-                        //                 } else {
-                        //                     self.id_check = CheckError {
-                        //                         is_error: true,
-                        //                         err_msg: "ID doesn't exist.".to_owned(),
-                        //                     };
-                        //                 }
-                        //             }
-                        //         } else {
-                        //             self.id_check = CheckError {
-                        //                 is_error: true,
-                        //                 err_msg: "No ID".to_owned(),
-                        //             };
-                        //         }
-
-                        //         if row_count != 1 {
-                        //             println!("Error");
-                        //             self.id_check = CheckError {
-                        //                 is_error: true,
-                        //                 err_msg: "No ID".to_owned(),
-                        //             };
-                        //         }
-                        //     } else {
-                        //         self.id_check = CheckError {
-                        //             is_error: true,
-                        //             err_msg: "No ID".to_owned(),
-                        //         };
-                        //         println!("Error");
-                        //     }
-                        // }
                     }
                 }
 
@@ -462,102 +430,238 @@ impl eframe::App for TemplateApp {
 
             ui.separator();
 
-            let available_height = ui.available_height();
-            let table = TableBuilder::new(ui)
-                .striped(true)
-                .stick_to_bottom(true)
-                .scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
-                .resizable(false)
-                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(Column::exact(50.0))
-                .column(Column::exact(200.0))
-                .column(Column::exact(200.0))
-                .column(Column::exact(200.0))
-                .column(Column::exact(200.0))
-                .column(Column::exact(200.0))
-                .column(Column::remainder())
-                .min_scrolled_height(0.0)
-                .max_scroll_height(available_height);
+            if self.is_emergency && (self.emergency.missing_list.len() > 0) {
 
-            table
-                .header(40.0, |mut header| {
-                    header.col(|ui| {
-                        ui.strong("INDEX");
-                    });
-                    header.col(|ui| {
-                        ui.strong("ID");
-                    });
-                    header.col(|ui| {
-                        ui.strong("FIRST NAME");
-                    });
-                    header.col(|ui| {
-                        ui.strong("LAST NAME");
-                    });
-                    header.col(|ui| {
-                        ui.strong("DEPARTMENT");
-                    });
-                    header.col(|ui| {
-                        ui.strong("STATUS");
-                    });
-                    header.col(|ui| {
-                        ui.strong("TIMESTAMP");
-                    });
-                })
-                .body(|mut body| {
-                    let row_height = 20.0;
-                    let num_rows = self.employee_buffer.len();
+                ui.heading("Missing List");
+                let available_height = ui.available_height();
+                let table = TableBuilder::new(ui)
+                    .striped(true)
+                    //.stick_to_bottom(true)
+                    //.scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
+                    .resizable(true)
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                    .column(Column::exact(30.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(80.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::remainder())
+                    .min_scrolled_height(0.0)
+                    .max_scroll_height(available_height);
 
-                    body.rows(row_height, num_rows, |mut row| {
-                        let index = row.index();
-                        let employee = &self.employee_buffer[index];
-                        row.col(|ui| {
-                            ui.label(format!("{index}"));
+                table
+
+                    .header(40.0, |mut header| {
+                        header.col(|ui| {
+                            ui.strong("INDEX");
                         });
-                        row.col(|ui| {
-                            let id = &employee.id;
-                            ui.label(format!("{id}"));
+                        header.col(|ui| {
+                            ui.strong("ID");
                         });
-                        row.col(|ui| {
-                            let first_name = &employee.first_name;
-                            ui.label(format!("{first_name}"));
+                        header.col(|ui| {
+                            ui.strong("NAME");
                         });
-                        row.col(|ui| {
-                            let last_name = &employee.last_name;
-                            ui.label(format!("{last_name}"));
+                        header.col(|ui| {
+                            ui.strong("DEPARTMENT");
                         });
-                        row.col(|ui| {
-                            let department = &employee.department;
-                            ui.label(format!("{department}"));
+                        header.col(|ui| {
+                            ui.strong("TITLE");
                         });
-                        row.col(|ui| {
-                            //ui.label("IN");
-                            let in_base = &employee.in_base;
-                            if *in_base == 1 {
-                                ui.add(
-                                    Button::new("  IN  ")
-                                        .fill(Color32::GREEN)
-                                        .corner_radius(0.0)
-                                        .min_size(Vec2::new(100.0, 10.0))
-                                        .frame(false),
-                                );
-                            } else {
-                                ui.add(
-                                    Button::new("  OUT  ")
-                                        .fill(Color32::RED)
-                                        .corner_radius(0.0)
-                                        .min_size(Vec2::new(100.0, 10.0))
-                                        .frame(false),
-                                );
-                            }
+                        header.col(|ui| {
+                            ui.strong("EXPRO ID");
                         });
-                        row.col(|ui| {
-                            let timestamp = &employee.last_timestamp;
-                            let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
-                            
-                            ui.label(format!("{time_str}"));
+                        header.col(|ui| {
+                            ui.strong("FIELD");
+                        });
+                        header.col(|ui| {
+                            ui.strong("STATUS");
+                        });
+                        header.col(|ui| {
+                            ui.strong("TIMESTAMP");
                         });
                     })
-                });
+                    .body(|body| {
+                        let row_height = 20.0;
+                        let num_rows = self.emergency.missing_list.len();
+
+                        body.rows(row_height, num_rows, |mut row| {
+                            let index = row.index();
+                            let employee = &self.emergency.missing_list[index];
+                            row.col(|ui| {
+                                ui.label(format!("{index}"));
+                            });
+                            row.col(|ui| {
+                                let id = &employee.id;
+                                ui.label(format!("{id}"));
+                            });
+                            row.col(|ui| {
+                                let name = &employee.name;
+                                ui.label(format!("{name}"));
+                            });
+                            row.col(|ui| {
+                                let department = &employee.department;
+                                ui.label(format!("{department}"));
+                            });
+                            row.col(|ui| {
+                                let title = &employee.title;
+                                ui.label(format!("{title}"));
+                            });
+                            row.col(|ui| {
+                                let expro_id = &employee.expro_id;
+                                ui.label(format!("{expro_id}"));
+                            });
+                            row.col(|ui| {
+                                let field = &employee.field;
+                                ui.label(format!("{field}"));
+                            });
+                            row.col(|ui| {
+                                //ui.label("IN");
+                                let in_base = &employee.in_base;
+                                if *in_base == 1 {
+                                    ui.add(
+                                        Button::new("  MISSING  ")
+                                            .fill(Color32::RED)
+                                            .corner_radius(0.0)
+                                            .min_size(Vec2::new(100.0, 10.0))
+                                            .frame(false),
+                                    );
+                                } else {
+                                    ui.add(
+                                        Button::new("  OUT  ")
+                                            .fill(Color32::RED)
+                                            .corner_radius(0.0)
+                                            .min_size(Vec2::new(100.0, 10.0))
+                                            .frame(false),
+                                    );
+                                }
+                            });
+                            row.col(|ui| {
+                                let timestamp = &employee.last_timestamp;
+                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
+                            
+                                ui.label(format!("{time_str}"));
+                            });
+                        })
+                    });
+                
+            } else {
+                
+                let available_height = ui.available_height();
+                let table = TableBuilder::new(ui)
+                    .striped(true)
+                    .stick_to_bottom(true)
+                    .scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
+                    .resizable(false)
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                    .column(Column::exact(30.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(80.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::remainder())
+                    .min_scrolled_height(0.0)
+                    .max_scroll_height(available_height);
+
+                table
+                    .header(40.0, |mut header| {
+                        header.col(|ui| {
+                            ui.strong("INDEX");
+                        });
+                        header.col(|ui| {
+                            ui.strong("ID");
+                        });
+                        header.col(|ui| {
+                            ui.strong("NAME");
+                        });
+                        header.col(|ui| {
+                            ui.strong("DEPARTMENT");
+                        });
+                        header.col(|ui| {
+                            ui.strong("TITLE");
+                        });
+                        header.col(|ui| {
+                            ui.strong("EXPRO ID");
+                        });
+                        header.col(|ui| {
+                            ui.strong("FIELD");
+                        });
+                        header.col(|ui| {
+                            ui.strong("STATUS");
+                        });
+                        header.col(|ui| {
+                            ui.strong("TIMESTAMP");
+                        });
+                    })
+                    .body(|mut body| {
+                        let row_height = 20.0;
+                        let num_rows = self.employee_buffer.len();
+
+                        body.rows(row_height, num_rows, |mut row| {
+                            let index = row.index();
+                            let employee = &self.employee_buffer[index];
+                            row.col(|ui| {
+                                ui.label(format!("{index}"));
+                            });
+                            row.col(|ui| {
+                                let id = &employee.id;
+                                ui.label(format!("{id}"));
+                            });
+                            row.col(|ui| {
+                                let name = &employee.name;
+                                ui.label(format!("{name}"));
+                            });
+                            row.col(|ui| {
+                                let department = &employee.department;
+                                ui.label(format!("{department}"));
+                            });
+                            row.col(|ui| {
+                                let title = &employee.title;
+                                ui.label(format!("{title}"));
+                            });
+                            row.col(|ui| {
+                                let expro_id = &employee.expro_id;
+                                ui.label(format!("{expro_id}"));
+                            });
+                            row.col(|ui| {
+                                let field = &employee.field;
+                                ui.label(format!("{field}"));
+                            });
+                            row.col(|ui| {
+                                //ui.label("IN");
+                                let in_base = &employee.in_base;
+                                if *in_base == 1 {
+                                    ui.add(
+                                        Button::new("  IN  ")
+                                            .fill(Color32::GREEN)
+                                            .corner_radius(0.0)
+                                            .min_size(Vec2::new(100.0, 10.0))
+                                            .frame(false),
+                                    );
+                                } else {
+                                    ui.add(
+                                        Button::new("  OUT  ")
+                                            .fill(Color32::RED)
+                                            .corner_radius(0.0)
+                                            .min_size(Vec2::new(100.0, 10.0))
+                                            .frame(false),
+                                    );
+                                }
+                            });
+                            row.col(|ui| {
+                                let timestamp = &employee.last_timestamp;
+                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
+                            
+                                ui.label(format!("{time_str}"));
+                            });
+                        })
+                    });
+            }
             // ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             //     powered_by_egui_and_eframe(ui);
             //     egui::warn_if_debug_build(ui);
@@ -572,7 +676,81 @@ impl eframe::App for TemplateApp {
                 // egui::Image::new(egui::include_image!("../assets/logo.png"))
                 //     .paint_at(ui, ctx.available_rect());
                 ui.add(egui::Image::new(egui::include_image!("../assets/logo.png")));
-                ui.vertical_centered(|ui| {});
+                ui.vertical_centered(|ui| {
+                    if ui.add(Button::new("EMERGENCY").min_size(Vec2::new(184., 40.))).clicked() {
+                        self.is_emergency = true;
+
+                        let pool = Pool::new(self.db_url.as_str());
+                        if let Ok(pool) = pool {
+                            if let Ok(mut conn) = pool.get_conn() {
+                                
+                                let res = conn.query_map(
+                                    format!(
+                                    r#"
+                                        SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                                        WHERE in_base="{}";
+                                    "#,
+                                        1
+                                    ),
+                                    |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
+                                        Employee {
+                                            id,
+                                            name,
+                                            department,
+                                            title,
+                                            expro_id,
+                                            field,
+                                            category,
+                                            in_base,
+                                            last_timestamp
+                                        }
+                                    }
+                                );
+
+                                if let Ok(res) = res {
+                                    self.emergency.on_base_total = res.len();
+                                    self.emergency.on_base_list = res.clone();
+
+                                    let hash: HashSet<Employee> = HashSet::from_iter(res);
+                                    self.emergency.all_employees_hash = hash;
+                                }
+
+                            }
+                        }
+                    }
+
+                    
+                    if self.is_emergency {
+                        
+                        ui.heading(format!("ON BASE TOTAL:"));
+                        ui.heading(format!("{}", self.emergency.all_employees_hash.len()));
+                        ui.heading(format!("CURRENT COUNT:"));
+                        ui.heading(format!("{}", self.emergency.present_employees_hash.len()));
+                        ui.heading(format!("MISSING:"));
+                        ui.heading(format!("{}", self.emergency.missing_list.len()));
+                        if ui.add(Button::new("COUNT").min_size(Vec2::new(184., 40.))).clicked() {
+                            let diff: Vec<_> = self.emergency.all_employees_hash.difference(&self.emergency.present_employees_hash).map(|employee| employee.clone()).collect();
+                            self.emergency.missing_list = diff;
+                        }
+                        if ui.add(Button::new("RESET").min_size(Vec2::new(184., 40.))).clicked() {
+                            self.reset_pressed = true;
+
+                        }
+                        if self.reset_pressed {
+                            
+                            if ui.add(Button::new("CONFIRM RESET").min_size(Vec2::new(184., 40.))).clicked() {
+                                self.emergency.on_base_total = 0;
+                                self.emergency.on_base_list = Vec::new();
+                                self.emergency.count_list = Vec::new();
+                                self.emergency.all_employees_hash.clear();
+                                self.emergency.present_employees_hash.clear();
+                                self.emergency.missing_list.clear();
+                                self.reset_pressed = false;
+                                self.is_emergency = false;
+                            }
+                        }
+                    }
+                });
             });
     }
 }

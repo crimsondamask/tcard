@@ -18,9 +18,9 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "TCARD SYS",
+        "Expro Access Control",
         native_options,
-        Box::new(|cc| Ok(Box::new(tcard::TemplateApp::new(cc)))),
+        Box::new(|cc| Ok(Box::new(expro_access::TemplateApp::new(cc)))),
     )
 }
 
