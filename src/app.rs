@@ -6,7 +6,7 @@ use crossbeam_channel::{Receiver, Sender};
 use mysql::prelude::*;
 use mysql::*;
 //use sqlx::mysql::MySqlPool;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, io::Write, sync::Arc};
 
 use chrono::DateTime;
 use egui::{
@@ -633,12 +633,91 @@ impl eframe::App for TemplateApp {
                                 .clicked()
                             {
                                 // TODO
+                                match generate_report(self) {
+                                    Err(e) => {
+                                        self.id_check.is_error = true;
+                                        self.id_check.err_msg = format!("{}", e)
+                                    }
+                                    Ok(_) => {}
+                                }
                             }
                         }
                     }
                 });
             });
     }
+}
+fn generate_report(app: &mut TemplateApp) -> Result<()> {
+    let mut template_str = r#"
+ 
+                            #set page(paper: "a4", margin: (
+                              top: 3cm,
+                                bottom: 3cm,
+                                  left: 2cm, 
+                                right: 2cm,
+                                              x: 1cm,
+                                                  ), header: context {
+                                                        [
+
+                                                                _Expro Emergency Access Report_
+                                                                    #h(1fr)
+                                                                        #counter(page).display()
+                                                                          ]
+                                                                          }, )
+
+
+                                                                          #set text(font: "Arial", size: 6pt)
+
+                                                                          // Medium bold table header.
+                                                                          #show table.cell.where(y: 0): set text(weight: "medium")
+
+                                                                          // Bold titles.
+
+                                                                          // See the strokes section for details on this!
+                                                                          #let frame(stroke) = (x, y) => (
+                                                                                left: if x > 0 { 0pt } else { stroke },
+                                                                                  right: stroke,
+                                                                                    top: if y < 2 { stroke } else { 0pt },
+                                                                                      bottom: stroke,
+                                                                                      )
+
+                                                                                      #set table(
+                                                                                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                                                                                              stroke: frame(rgb("21222C")),
+                                                                                              )
+
+                                                                                              #table(
+                                                                                                    columns: (1fr, 1fr, 1fr, 1fr, 0.5fr),
+
+                                                                                                      table.header[ID][Name][Department][Function][Status],
+                                "#.to_owned();
+    for missing in app.emergency.missing_list.clone() {
+        let typst_string = format!(
+            "\n[{}], [{}], [{}], [{}], [MISSING],",
+            missing.id, missing.name, missing.department, missing.title
+        );
+        template_str.push_str(&typst_string);
+    }
+    template_str.push_str(
+        r#"
+          )
+        "#,
+    );
+
+    let mut file = std::fs::File::options()
+        .write(true)
+        .truncate(true)
+        .open("template.typ")?;
+    file.write_all(template_str.as_bytes())?;
+
+    let _compile_cmd = std::process::Command::new("cmd")
+        .args(["/C", "typst compile template.typ"])
+        .output()?;
+    let _pdf_open_cmd = std::process::Command::new("cmd")
+        .args(["/C", "start template.pdf"])
+        .output()?;
+
+    Ok(())
 }
 // Query a list of the employees who are currently inside the base.
 fn emergency_get_employee_list(app: &mut TemplateApp) -> Result<()> {
