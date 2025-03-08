@@ -179,9 +179,6 @@ impl eframe::App for TemplateApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-
         if self.first_frame {
             // let (id_send_channel, id_receive_channel): (
             //     Sender<Option<String>>,
@@ -289,130 +286,8 @@ impl eframe::App for TemplateApp {
                                 self.id_check.err_msg = format!("{}", e);
                             }
                         }
-                        // let pool = Pool::new(self.db_url.as_str());
-                        // if let Ok(pool) = pool {
-                        //     if let Ok(mut conn) = pool.get_conn() {
-                        //         //println!("Connected");
-                        //         let res = conn.query_map(
-                        //             format!(
-                        //             r#"
-                        //                 SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
-                        //                 WHERE id="{}";
-                        //             "#,
-                        //                 self.input_result
-                        //             ),
-                        //             |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
-                        //                 Employee {
-                        //                     id,
-                        //                     name,
-                        //                     department,
-                        //                     title,
-                        //                     expro_id,
-                        //                     field,
-                        //                     category,
-                        //                     in_base,
-                        //                     last_timestamp
-                        //                 }
-                        //             }
-                        //         );
-                        //         if let Ok(res) = res {
-                        //             if res.len() == 1 {
-                        //                 self.id_check = CheckError {
-                        //                     is_error: false,
-                        //                     err_msg: "".to_owned(),
-                        //                 };
-                        //                 let timestamp = chrono::Local::now().to_utc().timestamp();
-                        //                 let mut employee_res = res[0].clone();
-                        //                 if self.is_emergency {
-                        //                     // We check if the employee has already been counted in the drill.
-                        //                     let mut exists = false;
-                        //                     for employee in self.emergency.count_list.iter_mut() {
-                        //                         if employee.id == employee_res.id {
-                        //                             exists = true;
-                        //                         }
-                        //                     }
-                        //                     if !exists {
-                        //                         // If the employee has not been counted we push them to the count list.
-                        //                         //self.emergency.count_list.push(employee_res.clone());
-                        //                         self.emergency.present_employees_hash.insert(employee_res.clone());
-
-                        //                     }
-                        //                 } else {
-                        //                     let duration_since = timestamp - employee_res.last_timestamp as i64;
-                        //                     if duration_since >= 30 {
-                        //                         if employee_res.in_base == 0 {
-                        //                             let res = conn.exec_drop(
-                        //                                     format!(
-                        //                                         "UPDATE expro_employees
-                        //                                     SET in_base=1, last_timestamp={}
-                        //                                     WHERE id={}",
-                        //                                         timestamp,
-                        //                                         employee_res.id
-                        //                                     ),
-                        //                                     ()
-                        //                             );
-                        //                             if res.is_ok() {
-                        //                                 employee_res.in_base = 1;
-                        //                                 employee_res.last_timestamp = timestamp as usize;
-                        //                                 self.employee_buffer.push(employee_res);
-                        //                             } else {
-                        //                                 self.id_check = CheckError {
-                        //                                     is_error: true,
-                        //                                     err_msg: "Could not edit employee status in the DB".to_owned(),
-                        //                                 };
-                        //                             }
-                        //                         } else {
-                        //                             let res = conn.query_drop(
-                        //                                     format!(
-                        //                                         "UPDATE expro_employees
-                        //                                     SET in_base=0, last_timestamp={}
-                        //                                     WHERE id={}",
-                        //                                         timestamp,
-                        //                                         employee_res.id
-                        //                                     )
-                        //                             );
-                        //                             if res.is_ok() {
-                        //                                 employee_res.in_base = 0;
-                        //                                 employee_res.last_timestamp = timestamp as usize;
-                        //                                 self.employee_buffer.push(employee_res);
-                        //                             } else {
-                        //                                 self.id_check = CheckError {
-                        //                                     is_error: true,
-                        //                                     err_msg: "Could not edit employee status in the DB".to_owned(),
-                        //                                 };
-                        //                             }
-                        //                         }
-                        //                     }
-                        //                 }
-                        //             } else {
-                        //                 self.id_check = CheckError {
-                        //                     is_error: true,
-                        //                     err_msg: "Could not find ID".to_owned(),
-                        //                 };
-                        //             }
-                        //         } else {
-                        //             self.id_check = CheckError {
-                        //             is_error: true,
-                        //             err_msg: "DB error ID".to_owned(),
-                        //                         };
-                        //             println!("N/A");
-                        //         }
-                        //     } else {
-                        //         self.id_check = CheckError {
-                        //             is_error: true,
-                        //             err_msg: "Could not connect to DB".to_owned(),
-                        //         };
-                        //     }
-                        // } else {
-                        //     self.id_check = CheckError {
-                        //         is_error: true,
-                        //         err_msg: "Could not create DB pool".to_owned(),
-                        //     };
-                        // }
                     }
                 }
-
-                //ui.text_edit_singleline(&mut self.label).request_focus();
             });
 
             ui.separator();
@@ -422,8 +297,6 @@ impl eframe::App for TemplateApp {
                 let available_height = ui.available_height();
                 let table = TableBuilder::new(ui)
                     .striped(true)
-                    //.stick_to_bottom(true)
-                    //.scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
                     .resizable(true)
                     .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                     .column(Column::exact(30.0))
@@ -647,10 +520,6 @@ impl eframe::App for TemplateApp {
                         })
                     });
             }
-            // ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-            //     powered_by_egui_and_eframe(ui);
-            //     egui::warn_if_debug_build(ui);
-            // });
         });
         egui::SidePanel::right("right")
             .min_width(200.0)
@@ -658,47 +527,22 @@ impl eframe::App for TemplateApp {
             .default_width(200.0)
             .resizable(false)
             .show(ctx, |ui| {
-                // egui::Image::new(egui::include_image!("../assets/logo.png"))
-                //     .paint_at(ui, ctx.available_rect());
                 ui.add(egui::Image::new(egui::include_image!("../assets/logo.png")));
                 ui.vertical_centered(|ui| {
-                    if ui.add(Button::new("EMERGENCY").min_size(Vec2::new(184., 40.))).clicked() {
+                    if ui
+                        .add(Button::new("EMERGENCY").min_size(Vec2::new(184., 40.)))
+                        .clicked()
+                    {
                         self.is_emergency = true;
 
-                        let pool = Pool::new(self.db_url.as_str());
-                        if let Ok(pool) = pool {
-                            if let Ok(mut conn) = pool.get_conn() {
-                                let res = conn.query_map(
-                                    format!(
-                                    r#"
-                                        SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
-                                        WHERE in_base={};
-                                    "#,
-                                        1
-                                    ),
-                                    |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
-                                        Employee {
-                                            id,
-                                            name,
-                                            department,
-                                            title,
-                                            expro_id,
-                                            field,
-                                            category,
-                                            in_base,
-                                            last_timestamp
-                                        }
-                                    }
-                                );
-
-                                if let Ok(res) = res {
-                                    self.emergency.on_base_total = res.len();
-                                    self.emergency.on_base_list = res.clone();
-
-                                    let hash: HashSet<Employee> = HashSet::from_iter(res);
-                                    self.emergency.all_employees_hash = hash;
-                                }
-
+                        match emergency_get_employee_list(self) {
+                            Ok(_) => {
+                                self.id_check.is_error = false;
+                                self.id_check.err_msg = "".to_owned();
+                            }
+                            Err(e) => {
+                                self.id_check.is_error = true;
+                                self.id_check.err_msg = format!("{}", e);
                             }
                         }
                     }
@@ -710,16 +554,29 @@ impl eframe::App for TemplateApp {
                         ui.heading(format!("{}", self.emergency.present_employees_hash.len()));
                         ui.heading(format!("MISSING:"));
                         ui.heading(format!("{}", self.emergency.missing_list.len()));
-                        if ui.add(Button::new("COUNT").min_size(Vec2::new(184., 40.))).clicked() {
-                            let diff: Vec<_> = self.emergency.all_employees_hash.difference(&self.emergency.present_employees_hash).map(|employee| employee.clone()).collect();
+                        if ui
+                            .add(Button::new("COUNT").min_size(Vec2::new(184., 40.)))
+                            .clicked()
+                        {
+                            let diff: Vec<_> = self
+                                .emergency
+                                .all_employees_hash
+                                .difference(&self.emergency.present_employees_hash)
+                                .map(|employee| employee.clone())
+                                .collect();
                             self.emergency.missing_list = diff;
                         }
-                        if ui.add(Button::new("RESET").min_size(Vec2::new(184., 40.))).clicked() {
+                        if ui
+                            .add(Button::new("RESET").min_size(Vec2::new(184., 40.)))
+                            .clicked()
+                        {
                             self.reset_pressed = true;
-
                         }
                         if self.reset_pressed {
-                            if ui.add(Button::new("CONFIRM RESET").min_size(Vec2::new(184., 40.))).clicked() {
+                            if ui
+                                .add(Button::new("CONFIRM RESET").min_size(Vec2::new(184., 40.)))
+                                .clicked()
+                            {
                                 self.emergency.on_base_total = 0;
                                 self.emergency.on_base_list = Vec::new();
                                 self.emergency.count_list = Vec::new();
@@ -735,6 +592,44 @@ impl eframe::App for TemplateApp {
             });
     }
 }
+// Query a list of the employees who are currently inside the base.
+fn emergency_get_employee_list(app: &mut TemplateApp) -> Result<()> {
+    let pool = Pool::new(app.db_url.as_str())?;
+    let mut conn = pool.get_conn()?;
+
+    let res = conn.query_map(
+            format!(
+                r#"
+                    SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                    WHERE in_base={};
+                "#,
+                    1
+            ),
+            |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
+                Employee {
+                    id,
+                    name,
+                    department,
+                    title,
+                    expro_id,
+                    field,
+                    category,
+                    in_base,
+                    last_timestamp
+                }
+            }
+    )?;
+    app.emergency.on_base_total = res.len();
+    app.emergency.on_base_list = res.clone();
+
+    let hash: HashSet<Employee> = HashSet::from_iter(res);
+    app.emergency.all_employees_hash = hash;
+
+    Ok(())
+}
+
+// Process the employee ID and update the employee status (IN or OUT)
+// Errors are bubbled up and dealt with by the caller.
 fn process_id(app: &mut TemplateApp) -> Result<()> {
     let pool = Pool::new(app.db_url.as_str())?;
     let mut conn = pool.get_conn()?;
@@ -766,6 +661,8 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         let timestamp = chrono::Local::now().naive_local().and_utc().timestamp();
         let mut employee_res = res[0].clone();
 
+        // During emergencies we no longer update the employee status
+        // but we push the employee id into the emergency hash for counting.
         if app.is_emergency {
             // We check if the employee has already been counted in the drill.
             let mut exists = false;
@@ -776,7 +673,6 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
             }
             if !exists {
                 // If the employee has not been counted we push them to the count list.
-                //self.emergency.count_list.push(employee_res.clone());
                 app.emergency
                     .present_employees_hash
                     .insert(employee_res.clone());
