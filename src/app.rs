@@ -19,7 +19,7 @@ struct CheckError {
     is_error: bool,
     err_msg: String,
 }
-#[derive(Debug, Hash , Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 struct Employee {
     id: String,
     name: String,
@@ -41,7 +41,7 @@ struct Emergency {
     #[serde(skip)] // This how you opt-out of serialization of a field
     all_employees_hash: HashSet<Employee>,
     #[serde(skip)] // This how you opt-out of serialization of a field
-    present_employees_hash: HashSet<Employee>
+    present_employees_hash: HashSet<Employee>,
 }
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -269,7 +269,6 @@ impl eframe::App for TemplateApp {
                         let edit = TextEdit::singleline(&mut self.id_input).lock_focus(true);
                     ui.add(edit);
                     ui.end_row();
-                    
                 }
                 });
 
@@ -305,33 +304,28 @@ impl eframe::App for TemplateApp {
                                         }
                                     }
                                 );
-
                                 if let Ok(res) = res {
                                     if res.len() == 1 {
                                         self.id_check = CheckError {
                                             is_error: false,
                                             err_msg: "".to_owned(),
                                         };
-
                                         let timestamp = chrono::Local::now().to_utc().timestamp();
                                         let mut employee_res = res[0].clone();
                                         if self.is_emergency {
                                             // We check if the employee has already been counted in the drill.
                                             let mut exists = false;
                                             for employee in self.emergency.count_list.iter_mut() {
-                                                if employee.id == employee_res.id { 
-                                                    exists = true; 
+                                                if employee.id == employee_res.id {
+                                                    exists = true;
                                                 }
                                             }
-
                                             if !exists {
-                                                
                                                 // If the employee has not been counted we push them to the count list.
                                                 //self.emergency.count_list.push(employee_res.clone());
                                                 self.emergency.present_employees_hash.insert(employee_res.clone());
 
                                             }
-
                                         } else {
                                             let duration_since = timestamp - employee_res.last_timestamp as i64;
                                             if duration_since >= 30 {
@@ -346,22 +340,16 @@ impl eframe::App for TemplateApp {
                                                             ),
                                                             ()
                                                     );
-
                                                     if res.is_ok() {
-                                                        // println!("{:?}", res);
-                                                
                                                         employee_res.in_base = 1;
                                                         employee_res.last_timestamp = timestamp as usize;
                                                         self.employee_buffer.push(employee_res);
-                                                
                                                     } else {
                                                         self.id_check = CheckError {
                                                             is_error: true,
                                                             err_msg: "Could not edit employee status in the DB".to_owned(),
                                                         };
-                                                
                                                     }
-                                            
                                                 } else {
                                                     let res = conn.query_drop(
                                                             format!(
@@ -371,36 +359,25 @@ impl eframe::App for TemplateApp {
                                                                 timestamp,
                                                                 employee_res.id
                                                             )
-                                                    
                                                     );
-
                                                     if res.is_ok() {
-                                                
                                                         employee_res.in_base = 0;
                                                         employee_res.last_timestamp = timestamp as usize;
                                                         self.employee_buffer.push(employee_res);
-                                                
                                                     } else {
                                                         self.id_check = CheckError {
                                                             is_error: true,
                                                             err_msg: "Could not edit employee status in the DB".to_owned(),
                                                         };
-                                                
                                                     }
-                                            
-                                                }                                                
+                                                }
                                             }
-                                                                                        
                                         }
-
-                                        
-                                        
                                     } else {
                                         self.id_check = CheckError {
                                             is_error: true,
                                             err_msg: "Could not find ID".to_owned(),
                                         };
-                                        
                                     }
                                 } else {
                                     self.id_check = CheckError {
@@ -420,7 +397,6 @@ impl eframe::App for TemplateApp {
                                 is_error: true,
                                 err_msg: "Could not create DB pool".to_owned(),
                             };
-                            
                         }
                     }
                 }
@@ -541,14 +517,11 @@ impl eframe::App for TemplateApp {
                             row.col(|ui| {
                                 let timestamp = &employee.last_timestamp;
                                 let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
-                            
                                 ui.label(format!("{time_str}"));
                             });
                         })
                     });
-                
             } else {
-                
                 let available_height = ui.available_height();
                 let table = TableBuilder::new(ui)
                     .striped(true)
@@ -656,7 +629,6 @@ impl eframe::App for TemplateApp {
                             row.col(|ui| {
                                 let timestamp = &employee.last_timestamp;
                                 let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
-                            
                                 ui.label(format!("{time_str}"));
                             });
                         })
@@ -683,12 +655,11 @@ impl eframe::App for TemplateApp {
                         let pool = Pool::new(self.db_url.as_str());
                         if let Ok(pool) = pool {
                             if let Ok(mut conn) = pool.get_conn() {
-                                
                                 let res = conn.query_map(
                                     format!(
                                     r#"
                                         SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
-                                        WHERE in_base="{}";
+                                        WHERE in_base={};
                                     "#,
                                         1
                                     ),
@@ -719,9 +690,7 @@ impl eframe::App for TemplateApp {
                         }
                     }
 
-                    
                     if self.is_emergency {
-                        
                         ui.heading(format!("ON BASE TOTAL:"));
                         ui.heading(format!("{}", self.emergency.all_employees_hash.len()));
                         ui.heading(format!("CURRENT COUNT:"));
@@ -737,7 +706,6 @@ impl eframe::App for TemplateApp {
 
                         }
                         if self.reset_pressed {
-                            
                             if ui.add(Button::new("CONFIRM RESET").min_size(Vec2::new(184., 40.))).clicked() {
                                 self.emergency.on_base_total = 0;
                                 self.emergency.on_base_list = Vec::new();
