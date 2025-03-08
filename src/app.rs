@@ -49,6 +49,10 @@ struct Emergency {
 pub struct TemplateApp {
     // Example stuff:
     #[serde(skip)] // This how you opt-out of serialization of a field
+    scanned_employee_name: String,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    count_pressed: bool,
+    #[serde(skip)] // This how you opt-out of serialization of a field
     reset_pressed: bool,
     emergency: Emergency,
     #[serde(skip)] // This how you opt-out of serialization of a field
@@ -83,6 +87,8 @@ impl Default for TemplateApp {
     fn default() -> Self {
         Self {
             // Example stuff:
+            scanned_employee_name: "".to_owned(),
+            count_pressed: false,
             reset_pressed: false,
             emergency: Emergency {
                 on_base_total: 0,
@@ -252,7 +258,15 @@ impl eframe::App for TemplateApp {
                         // ui.heading(format!("Error: {}", self.id_check.err_msg));
                         ui.label(
                             RichText::new(format!("ERROR: {}", self.id_check.err_msg))
+                                .size(16.)
                                 .background_color(Color32::RED),
+                        );
+                    } else if self.scanned_employee_name.len() > 6 {
+                        ui.label(
+                            RichText::new(format!("  {}  ", self.scanned_employee_name))
+                                .color(Color32::BLACK)
+                                .size(20.)
+                                .background_color(Color32::GREEN),
                         );
                     }
                     ui.end_row();
@@ -549,15 +563,40 @@ impl eframe::App for TemplateApp {
 
                     if self.is_emergency {
                         ui.heading(format!("ON BASE TOTAL:"));
-                        ui.heading(format!("{}", self.emergency.all_employees_hash.len()));
+                        ui.add(Label::new(
+                            RichText::new(format!(
+                                "   {}   ",
+                                self.emergency.all_employees_hash.len()
+                            ))
+                            .size(24.)
+                            .strong()
+                            .background_color(Color32::BLACK)
+                            .color(Color32::WHITE),
+                        ));
                         ui.heading(format!("CURRENT COUNT:"));
-                        ui.heading(format!("{}", self.emergency.present_employees_hash.len()));
+                        ui.add(Label::new(
+                            RichText::new(format!(
+                                "   {}   ",
+                                self.emergency.present_employees_hash.len()
+                            ))
+                            .size(24.)
+                            .strong()
+                            .background_color(Color32::BLACK)
+                            .color(Color32::WHITE),
+                        ));
                         ui.heading(format!("MISSING:"));
-                        ui.heading(format!("{}", self.emergency.missing_list.len()));
+                        ui.add(Label::new(
+                            RichText::new(format!("   {}   ", self.emergency.missing_list.len()))
+                                .size(24.)
+                                .strong()
+                                .background_color(Color32::BLACK)
+                                .color(Color32::WHITE),
+                        ));
                         if ui
                             .add(Button::new("COUNT").min_size(Vec2::new(184., 40.)))
                             .clicked()
                         {
+                            self.count_pressed = true;
                             let diff: Vec<_> = self
                                 .emergency
                                 .all_employees_hash
@@ -584,7 +623,16 @@ impl eframe::App for TemplateApp {
                                 self.emergency.present_employees_hash.clear();
                                 self.emergency.missing_list.clear();
                                 self.reset_pressed = false;
+                                self.count_pressed = false;
                                 self.is_emergency = false;
+                            }
+                        }
+                        if self.count_pressed {
+                            if ui
+                                .add(Button::new("GENERATE REPORT").min_size(Vec2::new(184., 40.)))
+                                .clicked()
+                            {
+                                // TODO
                             }
                         }
                     }
@@ -661,6 +709,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         let timestamp = chrono::Local::now().naive_local().and_utc().timestamp();
         let mut employee_res = res[0].clone();
 
+        app.scanned_employee_name = employee_res.name.clone();
         // During emergencies we no longer update the employee status
         // but we push the employee id into the emergency hash for counting.
         if app.is_emergency {
