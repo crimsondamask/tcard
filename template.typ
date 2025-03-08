@@ -41,9 +41,10 @@
 
                                                                                                       table.header[ID][Name][Department][Function][Status],
                                 
-[500800009716], [LAKRIB  Kamel], [WellTest], [ Welltest  Senior Field Technician 2], [MISSING],
+[500800011091993], [MADOUI Abdelkader], [DAQ  ], [DAQ Maintenance & PLC support Engineer], [MISSING],
 [5008006000011], [Visiteur 11], [], [], [MISSING],
-[5008005000010], [Visiteur 10], [], [], [MISSING],
 [500800016716], [LAKEHAL  Fares], [WellTest], [ Welltest Senior Field Technician 2], [MISSING],
+[500800009716], [LAKRIB  Kamel], [WellTest], [ Welltest  Senior Field Technician 2], [MISSING],
+[5008005000010], [Visiteur 10], [], [], [MISSING],
           )
         
