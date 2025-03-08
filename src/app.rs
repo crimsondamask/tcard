@@ -1,16 +1,17 @@
 //use rusqlite::Connection;
 
+use anyhow::{anyhow, Result};
 //use anyhow::Result;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use mysql::prelude::*;
 use mysql::*;
 //use sqlx::mysql::MySqlPool;
 use std::{collections::HashSet, sync::Arc};
 
-use chrono::{DateTime, NaiveDateTime};
+use chrono::DateTime;
 use egui::{
-    style::Selection, Button, Color32, CornerRadius, Label, Pos2, Rect, RichText, Stroke, TextEdit,
-    Vec2, Visuals,
+    style::Selection, Button, Color32, CornerRadius, Label, RichText, Stroke, TextEdit, Vec2,
+    Visuals,
 };
 use egui_extras::{Column, TableBuilder};
 
@@ -182,17 +183,17 @@ impl eframe::App for TemplateApp {
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
         if self.first_frame {
-            let (id_send_channel, id_receive_channel): (
-                Sender<Option<String>>,
-                Receiver<Option<String>>,
-            ) = unbounded();
-            let (empl_send_channel, empl_receive_channel): (
-                Sender<Option<Employee>>,
-                Receiver<Option<Employee>>,
-            ) = unbounded();
-            self.receive_channel = Some(empl_receive_channel.clone());
-            std::thread::spawn(move || {});
-            self.first_frame = false;
+            // let (id_send_channel, id_receive_channel): (
+            //     Sender<Option<String>>,
+            //     Receiver<Option<String>>,
+            // ) = unbounded();
+            // let (empl_send_channel, empl_receive_channel): (
+            //     Sender<Option<Employee>>,
+            //     Receiver<Option<Employee>>,
+            // ) = unbounded();
+            // self.receive_channel = Some(empl_receive_channel.clone());
+            // std::thread::spawn(move || {});
+            // self.first_frame = false;
         }
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
@@ -267,137 +268,147 @@ impl eframe::App for TemplateApp {
                         ui.add(edit).request_focus();
                     } else {
                         let edit = TextEdit::singleline(&mut self.id_input).lock_focus(true);
-                    ui.add(edit);
-                    ui.end_row();
-                }
+                        ui.add(edit);
+                        ui.end_row();
+                    }
                 });
 
-            ui.horizontal(|ui| {
+            ui.horizontal(|_ui| {
                 if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
                     if !self.id_input.is_empty() {
                         self.input_result = self.id_input.clone();
                         self.id_input = "".to_owned();
                         //let url = "mysql://root:admin@localhost:3306/employees";
-                        let pool = Pool::new(self.db_url.as_str());
-                        if let Ok(pool) = pool {
-                            if let Ok(mut conn) = pool.get_conn() {
-                                //println!("Connected");
-                                let res = conn.query_map(
-                                    format!(
-                                    r#"
-                                        SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
-                                        WHERE id="{}";
-                                    "#,
-                                        self.input_result
-                                    ),
-                                    |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
-                                        Employee {
-                                            id,
-                                            name,
-                                            department,
-                                            title,
-                                            expro_id,
-                                            field,
-                                            category,
-                                            in_base,
-                                            last_timestamp
-                                        }
-                                    }
-                                );
-                                if let Ok(res) = res {
-                                    if res.len() == 1 {
-                                        self.id_check = CheckError {
-                                            is_error: false,
-                                            err_msg: "".to_owned(),
-                                        };
-                                        let timestamp = chrono::Local::now().to_utc().timestamp();
-                                        let mut employee_res = res[0].clone();
-                                        if self.is_emergency {
-                                            // We check if the employee has already been counted in the drill.
-                                            let mut exists = false;
-                                            for employee in self.emergency.count_list.iter_mut() {
-                                                if employee.id == employee_res.id {
-                                                    exists = true;
-                                                }
-                                            }
-                                            if !exists {
-                                                // If the employee has not been counted we push them to the count list.
-                                                //self.emergency.count_list.push(employee_res.clone());
-                                                self.emergency.present_employees_hash.insert(employee_res.clone());
-
-                                            }
-                                        } else {
-                                            let duration_since = timestamp - employee_res.last_timestamp as i64;
-                                            if duration_since >= 30 {
-                                                if employee_res.in_base == 0 {
-                                                    let res = conn.exec_drop(
-                                                            format!(
-                                                                "UPDATE expro_employees
-                                                            SET in_base=1, last_timestamp={}
-                                                            WHERE id={}",
-                                                                timestamp,
-                                                                employee_res.id
-                                                            ),
-                                                            ()
-                                                    );
-                                                    if res.is_ok() {
-                                                        employee_res.in_base = 1;
-                                                        employee_res.last_timestamp = timestamp as usize;
-                                                        self.employee_buffer.push(employee_res);
-                                                    } else {
-                                                        self.id_check = CheckError {
-                                                            is_error: true,
-                                                            err_msg: "Could not edit employee status in the DB".to_owned(),
-                                                        };
-                                                    }
-                                                } else {
-                                                    let res = conn.query_drop(
-                                                            format!(
-                                                                "UPDATE expro_employees
-                                                            SET in_base=0, last_timestamp={}
-                                                            WHERE id={}",
-                                                                timestamp,
-                                                                employee_res.id
-                                                            )
-                                                    );
-                                                    if res.is_ok() {
-                                                        employee_res.in_base = 0;
-                                                        employee_res.last_timestamp = timestamp as usize;
-                                                        self.employee_buffer.push(employee_res);
-                                                    } else {
-                                                        self.id_check = CheckError {
-                                                            is_error: true,
-                                                            err_msg: "Could not edit employee status in the DB".to_owned(),
-                                                        };
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        self.id_check = CheckError {
-                                            is_error: true,
-                                            err_msg: "Could not find ID".to_owned(),
-                                        };
-                                    }
-                                } else {
-                                    self.id_check = CheckError {
-                                    is_error: true,
-                                    err_msg: "DB error ID".to_owned(),
-                                                };
-                                    println!("N/A");
-                                }
-                            } else {
-                                self.id_check = CheckError {
-                                    is_error: true,
-                                    err_msg: "Could not connect to DB".to_owned(),
-                                };
+                        match process_id(self) {
+                            Ok(_) => {
+                                self.id_check.is_error = false;
+                                self.id_check.err_msg = "".to_owned();
                             }
-                        } else {
-                            self.id_check = CheckError {
-                                is_error: true,
-                                err_msg: "Could not create DB pool".to_owned(),
-                            };
+                            Err(e) => {
+                                self.id_check.is_error = true;
+                                self.id_check.err_msg = format!("{}", e);
+                            }
                         }
+                        // let pool = Pool::new(self.db_url.as_str());
+                        // if let Ok(pool) = pool {
+                        //     if let Ok(mut conn) = pool.get_conn() {
+                        //         //println!("Connected");
+                        //         let res = conn.query_map(
+                        //             format!(
+                        //             r#"
+                        //                 SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                        //                 WHERE id="{}";
+                        //             "#,
+                        //                 self.input_result
+                        //             ),
+                        //             |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
+                        //                 Employee {
+                        //                     id,
+                        //                     name,
+                        //                     department,
+                        //                     title,
+                        //                     expro_id,
+                        //                     field,
+                        //                     category,
+                        //                     in_base,
+                        //                     last_timestamp
+                        //                 }
+                        //             }
+                        //         );
+                        //         if let Ok(res) = res {
+                        //             if res.len() == 1 {
+                        //                 self.id_check = CheckError {
+                        //                     is_error: false,
+                        //                     err_msg: "".to_owned(),
+                        //                 };
+                        //                 let timestamp = chrono::Local::now().to_utc().timestamp();
+                        //                 let mut employee_res = res[0].clone();
+                        //                 if self.is_emergency {
+                        //                     // We check if the employee has already been counted in the drill.
+                        //                     let mut exists = false;
+                        //                     for employee in self.emergency.count_list.iter_mut() {
+                        //                         if employee.id == employee_res.id {
+                        //                             exists = true;
+                        //                         }
+                        //                     }
+                        //                     if !exists {
+                        //                         // If the employee has not been counted we push them to the count list.
+                        //                         //self.emergency.count_list.push(employee_res.clone());
+                        //                         self.emergency.present_employees_hash.insert(employee_res.clone());
+
+                        //                     }
+                        //                 } else {
+                        //                     let duration_since = timestamp - employee_res.last_timestamp as i64;
+                        //                     if duration_since >= 30 {
+                        //                         if employee_res.in_base == 0 {
+                        //                             let res = conn.exec_drop(
+                        //                                     format!(
+                        //                                         "UPDATE expro_employees
+                        //                                     SET in_base=1, last_timestamp={}
+                        //                                     WHERE id={}",
+                        //                                         timestamp,
+                        //                                         employee_res.id
+                        //                                     ),
+                        //                                     ()
+                        //                             );
+                        //                             if res.is_ok() {
+                        //                                 employee_res.in_base = 1;
+                        //                                 employee_res.last_timestamp = timestamp as usize;
+                        //                                 self.employee_buffer.push(employee_res);
+                        //                             } else {
+                        //                                 self.id_check = CheckError {
+                        //                                     is_error: true,
+                        //                                     err_msg: "Could not edit employee status in the DB".to_owned(),
+                        //                                 };
+                        //                             }
+                        //                         } else {
+                        //                             let res = conn.query_drop(
+                        //                                     format!(
+                        //                                         "UPDATE expro_employees
+                        //                                     SET in_base=0, last_timestamp={}
+                        //                                     WHERE id={}",
+                        //                                         timestamp,
+                        //                                         employee_res.id
+                        //                                     )
+                        //                             );
+                        //                             if res.is_ok() {
+                        //                                 employee_res.in_base = 0;
+                        //                                 employee_res.last_timestamp = timestamp as usize;
+                        //                                 self.employee_buffer.push(employee_res);
+                        //                             } else {
+                        //                                 self.id_check = CheckError {
+                        //                                     is_error: true,
+                        //                                     err_msg: "Could not edit employee status in the DB".to_owned(),
+                        //                                 };
+                        //                             }
+                        //                         }
+                        //                     }
+                        //                 }
+                        //             } else {
+                        //                 self.id_check = CheckError {
+                        //                     is_error: true,
+                        //                     err_msg: "Could not find ID".to_owned(),
+                        //                 };
+                        //             }
+                        //         } else {
+                        //             self.id_check = CheckError {
+                        //             is_error: true,
+                        //             err_msg: "DB error ID".to_owned(),
+                        //                         };
+                        //             println!("N/A");
+                        //         }
+                        //     } else {
+                        //         self.id_check = CheckError {
+                        //             is_error: true,
+                        //             err_msg: "Could not connect to DB".to_owned(),
+                        //         };
+                        //     }
+                        // } else {
+                        //     self.id_check = CheckError {
+                        //         is_error: true,
+                        //         err_msg: "Could not create DB pool".to_owned(),
+                        //     };
+                        // }
                     }
                 }
 
@@ -407,7 +418,6 @@ impl eframe::App for TemplateApp {
             ui.separator();
 
             if self.is_emergency && (self.emergency.missing_list.len() > 0) {
-
                 ui.heading("Missing List");
                 let available_height = ui.available_height();
                 let table = TableBuilder::new(ui)
@@ -429,7 +439,6 @@ impl eframe::App for TemplateApp {
                     .max_scroll_height(available_height);
 
                 table
-
                     .header(40.0, |mut header| {
                         header.col(|ui| {
                             ui.strong("INDEX");
@@ -516,7 +525,9 @@ impl eframe::App for TemplateApp {
                             });
                             row.col(|ui| {
                                 let timestamp = &employee.last_timestamp;
-                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
+                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0)
+                                    .unwrap()
+                                    .format("%d-%m-%y %H:%M:%S");
                                 ui.label(format!("{time_str}"));
                             });
                         })
@@ -571,7 +582,7 @@ impl eframe::App for TemplateApp {
                             ui.strong("TIMESTAMP");
                         });
                     })
-                    .body(|mut body| {
+                    .body(|body| {
                         let row_height = 20.0;
                         let num_rows = self.employee_buffer.len();
 
@@ -628,7 +639,9 @@ impl eframe::App for TemplateApp {
                             });
                             row.col(|ui| {
                                 let timestamp = &employee.last_timestamp;
-                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0).unwrap().format("%d-%m-%y %H:%M:%S");
+                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0)
+                                    .unwrap()
+                                    .format("%d-%m-%y %H:%M:%S");
                                 ui.label(format!("{time_str}"));
                             });
                         })
@@ -721,4 +734,92 @@ impl eframe::App for TemplateApp {
                 });
             });
     }
+}
+fn process_id(app: &mut TemplateApp) -> Result<()> {
+    let pool = Pool::new(app.db_url.as_str())?;
+    let mut conn = pool.get_conn()?;
+
+    let res = conn.query_map(
+            format!(
+            r#"
+                SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                WHERE id={};
+            "#,
+            app.input_result
+            ),
+            |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
+                Employee {
+                    id,
+                    name,
+                    department,
+                    title,
+                    expro_id,
+                    field,
+                    category,
+                    in_base,
+                    last_timestamp
+                }
+            }
+    )?;
+
+    if res.len() == 1 {
+        let timestamp = chrono::Local::now().naive_local().and_utc().timestamp();
+        let mut employee_res = res[0].clone();
+
+        if app.is_emergency {
+            // We check if the employee has already been counted in the drill.
+            let mut exists = false;
+            for employee in app.emergency.count_list.iter_mut() {
+                if employee.id == employee_res.id {
+                    exists = true;
+                }
+            }
+            if !exists {
+                // If the employee has not been counted we push them to the count list.
+                //self.emergency.count_list.push(employee_res.clone());
+                app.emergency
+                    .present_employees_hash
+                    .insert(employee_res.clone());
+            }
+        } else {
+            let duration_since = timestamp - employee_res.last_timestamp as i64;
+
+            if duration_since >= 30 {
+                if employee_res.in_base == 0 {
+                    let _update_res = conn.exec_drop(
+                        format!(
+                            "UPDATE expro_employees
+                            SET in_base=1, last_timestamp={}
+                            WHERE id={}",
+                            timestamp, employee_res.id
+                        ),
+                        (),
+                    )?;
+
+                    employee_res.in_base = 1;
+                    employee_res.last_timestamp = timestamp as usize;
+                    app.employee_buffer.push(employee_res);
+                } else {
+                    let _update_res = conn.exec_drop(
+                        format!(
+                            "UPDATE expro_employees
+                            SET in_base=0, last_timestamp={}
+                            WHERE id={}",
+                            timestamp, employee_res.id
+                        ),
+                        (),
+                    )?;
+
+                    employee_res.in_base = 0;
+                    employee_res.last_timestamp = timestamp as usize;
+                    app.employee_buffer.push(employee_res);
+                }
+            }
+        }
+    } else if res.len() == 0 {
+        return Err(anyhow!("Could not find ID in the database."));
+    } else {
+        return Err(anyhow!("More than one ID found in the database."));
+    }
+    Ok(())
 }
