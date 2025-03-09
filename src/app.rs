@@ -49,6 +49,10 @@ struct Emergency {
 pub struct TemplateApp {
     // Example stuff:
     #[serde(skip)] // This how you opt-out of serialization of a field
+    last_log_dump: i64,
+    #[serde(skip)] // This how you opt-out of serialization of a field
+    log_dump_debounced: bool,
+    #[serde(skip)] // This how you opt-out of serialization of a field
     scanned_employee_name: String,
     #[serde(skip)] // This how you opt-out of serialization of a field
     count_pressed: bool,
@@ -86,6 +90,8 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
+            last_log_dump: 0,
+            log_dump_debounced: false,
             // Example stuff:
             scanned_employee_name: "".to_owned(),
             count_pressed: false,
@@ -185,19 +191,34 @@ impl eframe::App for TemplateApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Request repaint to keep updating the app even when it is not in view.
+        ctx.request_repaint();
+        let now = chrono::Local::now().naive_local().and_utc().timestamp();
+
+        //
         if self.first_frame {
-            // let (id_send_channel, id_receive_channel): (
-            //     Sender<Option<String>>,
-            //     Receiver<Option<String>>,
-            // ) = unbounded();
-            // let (empl_send_channel, empl_receive_channel): (
-            //     Sender<Option<Employee>>,
-            //     Receiver<Option<Employee>>,
-            // ) = unbounded();
-            // self.receive_channel = Some(empl_receive_channel.clone());
-            // std::thread::spawn(move || {});
-            // self.first_frame = false;
+            self.last_log_dump = now;
+            self.first_frame = false;
         }
+
+        // Check if the period is reached
+        // We use debounce here to avoid calling the log dump function multiple times within
+        // 1 second (60 fps)
+        if (now - self.last_log_dump) == 86400 && !self.log_dump_debounced {
+            self.log_dump_debounced = true;
+            self.last_log_dump = now;
+
+            match dump_24h_log_file(self, now) {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+
+        // Remove debounce after 1 second has passed
+        if (now - self.last_log_dump) > 1 {
+            self.log_dump_debounced = false;
+        }
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -233,8 +254,6 @@ impl eframe::App for TemplateApp {
                                 .italics(),
                         ));
                     }
-                    // let rect = Rect::from_min_max(Pos2::new(0.0, 20.0), Pos2::new(200.0, 100.0));
-                    // ui.horizontal(|ui| {});
                 });
             });
         });
@@ -424,7 +443,7 @@ impl eframe::App for TemplateApp {
                 let table = TableBuilder::new(ui)
                     .striped(true)
                     .stick_to_bottom(true)
-                    .scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
+                    //.scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
                     .resizable(false)
                     .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                     .column(Column::exact(30.0))
@@ -844,6 +863,43 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         return Err(anyhow!("Could not find ID in the database."));
     } else {
         return Err(anyhow!("More than one ID found in the database."));
+    }
+    Ok(())
+}
+
+fn dump_24h_log_file(app: &mut TemplateApp, timestamp: i64) -> Result<()> {
+    if let Some(date_time) = DateTime::from_timestamp(timestamp, 0) {
+        let mut buffer = String::new();
+        let date = date_time.naive_local().and_utc().format("%d%m%Y_%H%M");
+        let file_name = format!("LOG_{}.txt", date);
+
+        for record in app.employee_buffer.iter() {
+            let mut line = String::new();
+            let time = DateTime::from_timestamp(record.last_timestamp as i64, 0)
+                .unwrap()
+                .format("%d-%m-%Y\t%H:%M:%S");
+            if record.in_base == 0 {
+                line = format!(
+                    "{}\t{}\t{}\t{}\t{}\n",
+                    &record.name, &record.department, &record.title, "OUT", &time
+                );
+            } else {
+                line = format!(
+                    "{}\t{}\t{}\t{}\t{}\n",
+                    &record.name, &record.department, &record.title, "IN", &time
+                );
+            }
+
+            buffer.push_str(line.as_str());
+        }
+
+        let mut file = std::fs::File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(file_name)?;
+        file.write_all(buffer.as_bytes())?;
+        app.employee_buffer.clear();
     }
     Ok(())
 }
