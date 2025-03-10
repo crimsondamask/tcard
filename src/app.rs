@@ -35,8 +35,8 @@ struct Employee {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Emergency {
     on_base_total: usize,
-    on_base_list: Vec<Employee>,
-    count_list: Vec<Employee>,
+    //on_base_list: Vec<Employee>,
+    //count_list: Vec<Employee>,
     #[serde(skip)] // This how you opt-out of serialization of a field
     missing_list: Vec<Employee>,
     #[serde(skip)] // This how you opt-out of serialization of a field
@@ -98,8 +98,8 @@ impl Default for TemplateApp {
             reset_pressed: false,
             emergency: Emergency {
                 on_base_total: 0,
-                on_base_list: Vec::new(),
-                count_list: Vec::new(),
+                //on_base_list: Vec::new(),
+                //count_list: Vec::new(),
                 missing_list: Vec::new(),
                 all_employees_hash: HashSet::new(),
                 present_employees_hash: HashSet::new(),
@@ -283,9 +283,9 @@ impl eframe::App for TemplateApp {
                     } else if self.scanned_employee_name.len() > 6 {
                         ui.label(
                             RichText::new(format!("  {}  ", self.scanned_employee_name))
+                                .background_color(Color32::from_rgb(51, 204, 51))
                                 .color(Color32::BLACK)
-                                .size(20.)
-                                .background_color(Color32::GREEN),
+                                .size(20.),
                         );
                     }
                     ui.end_row();
@@ -325,7 +325,7 @@ impl eframe::App for TemplateApp {
 
             ui.separator();
 
-            if self.is_emergency && (self.emergency.missing_list.len() > 0) {
+            if self.is_emergency && (self.emergency.missing_list.len() > 0) && self.count_pressed {
                 ui.heading("Missing List");
                 let available_height = ui.available_height();
                 let table = TableBuilder::new(ui)
@@ -379,7 +379,7 @@ impl eframe::App for TemplateApp {
                         let num_rows = self.emergency.missing_list.len();
 
                         body.rows(row_height, num_rows, |mut row| {
-                            let index = row.index();
+                            let index = num_rows - 1 - row.index();
                             let employee = &self.emergency.missing_list[index];
                             row.col(|ui| {
                                 ui.label(format!("{index}"));
@@ -428,6 +428,110 @@ impl eframe::App for TemplateApp {
                                             .frame(false),
                                     );
                                 }
+                            });
+                            row.col(|ui| {
+                                let timestamp = &employee.last_timestamp;
+                                let time_str = DateTime::from_timestamp(*timestamp as i64, 0)
+                                    .unwrap()
+                                    .format("%d-%m-%y %H:%M:%S");
+                                ui.label(format!("{time_str}"));
+                            });
+                        })
+                    });
+            } else if self.is_emergency {
+                ui.heading("Employee Count List");
+                let available_height = ui.available_height();
+                let table = TableBuilder::new(ui)
+                    .striped(true)
+                    .resizable(true)
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                    .column(Column::exact(30.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::exact(200.0))
+                    .column(Column::exact(80.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::exact(100.0))
+                    .column(Column::remainder())
+                    .min_scrolled_height(0.0)
+                    .max_scroll_height(available_height);
+
+                table
+                    .header(40.0, |mut header| {
+                        header.col(|ui| {
+                            ui.strong("INDEX");
+                        });
+                        header.col(|ui| {
+                            ui.strong("ID");
+                        });
+                        header.col(|ui| {
+                            ui.strong("NAME");
+                        });
+                        header.col(|ui| {
+                            ui.strong("DEPARTMENT");
+                        });
+                        header.col(|ui| {
+                            ui.strong("TITLE");
+                        });
+                        header.col(|ui| {
+                            ui.strong("EXPRO ID");
+                        });
+                        header.col(|ui| {
+                            ui.strong("FIELD");
+                        });
+                        header.col(|ui| {
+                            ui.strong("STATUS");
+                        });
+                        header.col(|ui| {
+                            ui.strong("TIMESTAMP");
+                        });
+                    })
+                    .body(|body| {
+                        let row_height = 20.0;
+                        let num_rows = self.emergency.present_employees_hash.len();
+                        let present_employees_vec: Vec<&Employee> =
+                            self.emergency.present_employees_hash.iter().collect();
+
+                        body.rows(row_height, num_rows, |mut row| {
+                            let index = num_rows - 1 - row.index();
+                            let employee = present_employees_vec[index];
+                            row.col(|ui| {
+                                ui.label(format!("{index}"));
+                            });
+                            row.col(|ui| {
+                                let id = &employee.id;
+                                ui.label(format!("{id}"));
+                            });
+                            row.col(|ui| {
+                                let name = &employee.name;
+                                ui.label(format!("{name}"));
+                            });
+                            row.col(|ui| {
+                                let department = &employee.department;
+                                ui.label(format!("{department}"));
+                            });
+                            row.col(|ui| {
+                                let title = &employee.title;
+                                ui.label(format!("{title}"));
+                            });
+                            row.col(|ui| {
+                                let expro_id = &employee.expro_id;
+                                ui.label(format!("{expro_id}"));
+                            });
+                            row.col(|ui| {
+                                let field = &employee.field;
+                                ui.label(format!("{field}"));
+                            });
+                            row.col(|ui| {
+                                //ui.label("IN");
+                                ui.add(
+                                    Button::new("  PRESENT  ")
+                                        .fill(Color32::from_rgb(51, 204, 51))
+                                        .corner_radius(0.0)
+                                        .min_size(Vec2::new(100.0, 10.0))
+                                        .frame(false),
+                                );
                             });
                             row.col(|ui| {
                                 let timestamp = &employee.last_timestamp;
@@ -493,7 +597,8 @@ impl eframe::App for TemplateApp {
                         let num_rows = self.employee_buffer.len();
 
                         body.rows(row_height, num_rows, |mut row| {
-                            let index = row.index();
+                            let index = num_rows - 1 - row.index();
+
                             let employee = &self.employee_buffer[index];
                             row.col(|ui| {
                                 ui.label(format!("{index}"));
@@ -528,7 +633,7 @@ impl eframe::App for TemplateApp {
                                 if *in_base == 1 {
                                     ui.add(
                                         Button::new("  IN  ")
-                                            .fill(Color32::GREEN)
+                                            .fill(Color32::from_rgb(51, 204, 51))
                                             .corner_radius(0.0)
                                             .min_size(Vec2::new(100.0, 10.0))
                                             .frame(false),
@@ -536,7 +641,7 @@ impl eframe::App for TemplateApp {
                                 } else {
                                     ui.add(
                                         Button::new("  OUT  ")
-                                            .fill(Color32::RED)
+                                            .fill(Color32::from_rgb(242, 13, 13))
                                             .corner_radius(0.0)
                                             .min_size(Vec2::new(100.0, 10.0))
                                             .frame(false),
@@ -612,7 +717,11 @@ impl eframe::App for TemplateApp {
                                 .color(Color32::WHITE),
                         ));
                         if ui
-                            .add(Button::new("COUNT").min_size(Vec2::new(184., 40.)))
+                            .add(
+                                Button::new("COUNT")
+                                    .min_size(Vec2::new(184., 40.))
+                                    .fill(Color32::from_rgb(51, 204, 51)),
+                            )
                             .clicked()
                         {
                             self.count_pressed = true;
@@ -625,19 +734,27 @@ impl eframe::App for TemplateApp {
                             self.emergency.missing_list = diff;
                         }
                         if ui
-                            .add(Button::new("RESET").min_size(Vec2::new(184., 40.)))
+                            .add(
+                                Button::new("RESET")
+                                    .min_size(Vec2::new(184., 40.))
+                                    .fill(Color32::from_rgb(255, 204, 0)),
+                            )
                             .clicked()
                         {
                             self.reset_pressed = true;
                         }
                         if self.reset_pressed {
                             if ui
-                                .add(Button::new("CONFIRM RESET").min_size(Vec2::new(184., 40.)))
+                                .add(
+                                    Button::new("CONFIRM RESET")
+                                        .min_size(Vec2::new(184., 40.))
+                                        .fill(Color32::from_rgb(242, 13, 13)),
+                                )
                                 .clicked()
                             {
                                 self.emergency.on_base_total = 0;
-                                self.emergency.on_base_list = Vec::new();
-                                self.emergency.count_list = Vec::new();
+                                //self.emergency.on_base_list = Vec::new();
+                                //self.emergency.count_list = Vec::new();
                                 self.emergency.all_employees_hash.clear();
                                 self.emergency.present_employees_hash.clear();
                                 self.emergency.missing_list.clear();
@@ -766,7 +883,7 @@ fn emergency_get_employee_list(app: &mut TemplateApp) -> Result<()> {
             }
     )?;
     app.emergency.on_base_total = res.len();
-    app.emergency.on_base_list = res.clone();
+    //app.emergency.on_base_list = res.clone();
 
     let hash: HashSet<Employee> = HashSet::from_iter(res);
     app.emergency.all_employees_hash = hash;
@@ -805,57 +922,62 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
 
     if res.len() == 1 {
         let timestamp = chrono::Local::now().naive_local().and_utc().timestamp();
-        let mut employee_res = res[0].clone();
+        let mut employee_query_result = res[0].clone();
 
-        app.scanned_employee_name = employee_res.name.clone();
+        app.scanned_employee_name = employee_query_result.name.clone();
         // During emergencies we no longer update the employee status
         // but we push the employee id into the emergency hash for counting.
         if app.is_emergency {
+            if employee_query_result.in_base == 0 {
+                return Err(anyhow!("The employee is not inside the base."));
+            }
             // We check if the employee has already been counted in the drill.
             let mut exists = false;
-            for employee in app.emergency.count_list.iter_mut() {
-                if employee.id == employee_res.id {
+            for employee in app.emergency.present_employees_hash.iter() {
+                if employee.id == employee_query_result.id {
                     exists = true;
                 }
             }
             if !exists {
-                // If the employee has not been counted we push them to the count list.
+                // If the employee has not been counted we push them to the present list.
                 app.emergency
                     .present_employees_hash
-                    .insert(employee_res.clone());
+                    .insert(employee_query_result.clone());
+            } else {
+                return Err(anyhow!("The employee has already been counted."));
             }
         } else {
-            let duration_since = timestamp - employee_res.last_timestamp as i64;
+            let duration_since = timestamp - employee_query_result.last_timestamp as i64;
 
             if duration_since >= 30 {
-                if employee_res.in_base == 0 {
+                if employee_query_result.in_base == 0 {
                     let _update_res = conn.exec_drop(
                         format!(
                             "UPDATE expro_employees
                             SET in_base=1, last_timestamp={}
                             WHERE id={}",
-                            timestamp, employee_res.id
+                            timestamp, employee_query_result.id
                         ),
                         (),
                     )?;
 
-                    employee_res.in_base = 1;
-                    employee_res.last_timestamp = timestamp as usize;
-                    app.employee_buffer.push(employee_res);
+                    employee_query_result.in_base = 1;
+                    employee_query_result.last_timestamp = timestamp as usize;
+                    app.employee_buffer.push(employee_query_result);
                 } else {
                     let _update_res = conn.exec_drop(
                         format!(
                             "UPDATE expro_employees
                             SET in_base=0, last_timestamp={}
                             WHERE id={}",
-                            timestamp, employee_res.id
+                            timestamp, employee_query_result.id
                         ),
                         (),
                     )?;
 
-                    employee_res.in_base = 0;
-                    employee_res.last_timestamp = timestamp as usize;
-                    app.employee_buffer.push(employee_res);
+                    employee_query_result.in_base = 0;
+                    employee_query_result.last_timestamp = timestamp as usize;
+                    app.employee_buffer.push(employee_query_result);
                 }
             }
         }
