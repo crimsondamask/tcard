@@ -949,7 +949,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         } else {
             let duration_since = timestamp - employee_query_result.last_timestamp as i64;
 
-            if duration_since >= 30 {
+            if duration_since >= 10 {
                 if employee_query_result.in_base == 0 {
                     let _update_res = conn.exec_drop(
                         format!(
