@@ -6,15 +6,38 @@ use crossbeam_channel::{Receiver, Sender};
 use mysql::prelude::*;
 use mysql::*;
 //use sqlx::mysql::MySqlPool;
-use std::{collections::HashSet, io::Write, sync::Arc};
+use std::{collections::HashSet, fmt::Display, io::Write, sync::Arc};
 
 use chrono::DateTime;
 use egui::{
-    style::Selection, Button, Color32, CornerRadius, Label, RichText, Stroke, TextEdit, Vec2,
-    Visuals,
+    style::Selection, Button, Color32, ComboBox, CornerRadius, Label, RichText, Stroke, TextEdit,
+    Vec2, Visuals,
 };
 use egui_extras::{Column, TableBuilder};
 
+#[derive(PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+enum Base {
+    MainBase,
+    IkramBase,
+}
+
+impl Display for Base {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            &Base::MainBase => {
+                write!(f, "Main Base")
+            }
+            &Base::IkramBase => {
+                write!(f, "Ikram Base")
+            }
+        }
+    }
+}
+
+struct ScannedDetails {
+    employee_name: String,
+    status: String,
+}
 #[derive(serde::Deserialize, serde::Serialize)]
 struct CheckError {
     is_error: bool,
@@ -30,6 +53,7 @@ struct Employee {
     field: String,
     category: String,
     in_base: usize,
+    in_ikram: usize,
     last_timestamp: usize,
 }
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -50,10 +74,11 @@ pub struct TemplateApp {
     // Example stuff:
     #[serde(skip)] // This how you opt-out of serialization of a field
     last_log_dump: i64,
+    current_base: Base,
     #[serde(skip)] // This how you opt-out of serialization of a field
     log_dump_debounced: bool,
     #[serde(skip)] // This how you opt-out of serialization of a field
-    scanned_employee_name: String,
+    scanned_employee: ScannedDetails,
     #[serde(skip)] // This how you opt-out of serialization of a field
     count_pressed: bool,
     #[serde(skip)] // This how you opt-out of serialization of a field
@@ -91,9 +116,13 @@ impl Default for TemplateApp {
     fn default() -> Self {
         Self {
             last_log_dump: 0,
+            current_base: Base::MainBase,
             log_dump_debounced: false,
             // Example stuff:
-            scanned_employee_name: "".to_owned(),
+            scanned_employee: ScannedDetails {
+                employee_name: "".to_string(),
+                status: "".to_string(),
+            },
             count_pressed: false,
             reset_pressed: false,
             emergency: Emergency {
@@ -254,6 +283,20 @@ impl eframe::App for TemplateApp {
                                 .italics(),
                         ));
                     }
+                    ComboBox::from_label("Base:")
+                        .selected_text(format!("{}", self.current_base))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.current_base,
+                                Base::MainBase,
+                                "Main Base",
+                            );
+                            ui.selectable_value(
+                                &mut self.current_base,
+                                Base::IkramBase,
+                                "Ikram Base",
+                            );
+                        });
                 });
             });
         });
@@ -280,14 +323,30 @@ impl eframe::App for TemplateApp {
                                 .size(16.)
                                 .background_color(Color32::RED),
                         );
-                    } else if self.scanned_employee_name.len() > 6 {
+                    } else if self.scanned_employee.employee_name.len() > 6 {
                         ui.label(
-                            RichText::new(format!("  {}  ", self.scanned_employee_name))
+                            RichText::new(format!("  {}  ", self.scanned_employee.employee_name))
                                 .background_color(Color32::from_rgb(51, 204, 51))
                                 .color(Color32::BLACK)
                                 .size(20.),
                         );
                     }
+
+                    // if self.scanned_employee.status == "  IN  ".to_string() {
+                    //     ui.label(
+                    //         RichText::new(format!("{}", self.scanned_employee.status))
+                    //             .background_color(Color32::from_rgb(51, 204, 51))
+                    //             .color(Color32::BLACK)
+                    //             .size(20.),
+                    //     );
+                    // } else {
+                    //     ui.label(
+                    //         RichText::new(format!("{}", self.scanned_employee.status))
+                    //             .background_color(Color32::RED)
+                    //             .color(Color32::BLACK)
+                    //             .size(20.),
+                    //     );
+                    // }
                     ui.end_row();
                     ui.label("DB URL:");
                     ui.text_edit_singleline(&mut self.db_url);
@@ -332,15 +391,17 @@ impl eframe::App for TemplateApp {
                     .striped(true)
                     .resizable(true)
                     .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                    .column(Column::exact(30.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(80.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::remainder())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                    .vscroll(true)
                     .min_scrolled_height(0.0)
                     .max_scroll_height(available_height);
 
@@ -410,24 +471,13 @@ impl eframe::App for TemplateApp {
                             });
                             row.col(|ui| {
                                 //ui.label("IN");
-                                let in_base = &employee.in_base;
-                                if *in_base == 1 {
-                                    ui.add(
-                                        Button::new("  MISSING  ")
-                                            .fill(Color32::RED)
-                                            .corner_radius(0.0)
-                                            .min_size(Vec2::new(100.0, 10.0))
-                                            .frame(false),
-                                    );
-                                } else {
-                                    ui.add(
-                                        Button::new("  OUT  ")
-                                            .fill(Color32::RED)
-                                            .corner_radius(0.0)
-                                            .min_size(Vec2::new(100.0, 10.0))
-                                            .frame(false),
-                                    );
-                                }
+                                ui.add(
+                                    Button::new("  MISSING  ")
+                                        .fill(Color32::RED)
+                                        .corner_radius(0.0)
+                                        .min_size(Vec2::new(100.0, 10.0))
+                                        .frame(false),
+                                );
                             });
                             row.col(|ui| {
                                 let timestamp = &employee.last_timestamp;
@@ -443,17 +493,19 @@ impl eframe::App for TemplateApp {
                 let available_height = ui.available_height();
                 let table = TableBuilder::new(ui)
                     .striped(true)
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
                     .resizable(true)
                     .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                    .column(Column::exact(30.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(80.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::remainder())
+                    .vscroll(true)
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .min_scrolled_height(0.0)
                     .max_scroll_height(available_height);
 
@@ -548,17 +600,19 @@ impl eframe::App for TemplateApp {
                     .striped(true)
                     .stick_to_bottom(true)
                     //.scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
-                    .resizable(false)
+                    .resizable(true)
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
                     .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                    .column(Column::exact(30.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::exact(200.0))
-                    .column(Column::exact(80.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::exact(100.0))
-                    .column(Column::remainder())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .column(Column::auto())
+                    .vscroll(true)
                     .min_scrolled_height(0.0)
                     .max_scroll_height(available_height);
 
@@ -629,23 +683,47 @@ impl eframe::App for TemplateApp {
                             });
                             row.col(|ui| {
                                 //ui.label("IN");
-                                let in_base = &employee.in_base;
-                                if *in_base == 1 {
-                                    ui.add(
-                                        Button::new("  IN  ")
-                                            .fill(Color32::from_rgb(51, 204, 51))
-                                            .corner_radius(0.0)
-                                            .min_size(Vec2::new(100.0, 10.0))
-                                            .frame(false),
-                                    );
-                                } else {
-                                    ui.add(
-                                        Button::new("  OUT  ")
-                                            .fill(Color32::from_rgb(242, 13, 13))
-                                            .corner_radius(0.0)
-                                            .min_size(Vec2::new(100.0, 10.0))
-                                            .frame(false),
-                                    );
+                                match self.current_base {
+                                    Base::MainBase => {
+                                        let in_base = &employee.in_base;
+                                        if *in_base == 1 {
+                                            ui.add(
+                                                Button::new("  IN  ")
+                                                    .fill(Color32::from_rgb(51, 204, 51))
+                                                    .corner_radius(0.0)
+                                                    .min_size(Vec2::new(100.0, 10.0))
+                                                    .frame(false),
+                                            );
+                                        } else {
+                                            ui.add(
+                                                Button::new("  OUT  ")
+                                                    .fill(Color32::from_rgb(242, 13, 13))
+                                                    .corner_radius(0.0)
+                                                    .min_size(Vec2::new(100.0, 10.0))
+                                                    .frame(false),
+                                            );
+                                        }
+                                    }
+                                    Base::IkramBase => {
+                                        let in_ikram = &employee.in_ikram;
+                                        if *in_ikram == 1 {
+                                            ui.add(
+                                                Button::new("  IN  ")
+                                                    .fill(Color32::from_rgb(51, 204, 51))
+                                                    .corner_radius(0.0)
+                                                    .min_size(Vec2::new(100.0, 10.0))
+                                                    .frame(false),
+                                            );
+                                        } else {
+                                            ui.add(
+                                                Button::new("  OUT  ")
+                                                    .fill(Color32::from_rgb(242, 13, 13))
+                                                    .corner_radius(0.0)
+                                                    .min_size(Vec2::new(100.0, 10.0))
+                                                    .frame(false),
+                                            );
+                                        }
+                                    }
                                 }
                             });
                             row.col(|ui| {
@@ -860,15 +938,17 @@ fn emergency_get_employee_list(app: &mut TemplateApp) -> Result<()> {
     let pool = Pool::new(app.db_url.as_str())?;
     let mut conn = pool.get_conn()?;
 
-    let res = conn.query_map(
+    match app.current_base {
+        Base::MainBase => {
+            let res = conn.query_map(
             format!(
                 r#"
-                    SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                    SELECT id, name, department, title, expro_id, field, category, in_base, in_ikram, last_timestamp FROM expro_employees
                     WHERE in_base={};
                 "#,
                     1
             ),
-            |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
+            |(id, name, department, title, expro_id, field, category, in_base, in_ikram, last_timestamp)| {
                 Employee {
                     id,
                     name,
@@ -878,16 +958,48 @@ fn emergency_get_employee_list(app: &mut TemplateApp) -> Result<()> {
                     field,
                     category,
                     in_base,
+                    in_ikram,
                     last_timestamp
                 }
             }
     )?;
-    app.emergency.on_base_total = res.len();
-    //app.emergency.on_base_list = res.clone();
+            app.emergency.on_base_total = res.len();
+            //app.emergency.on_base_list = res.clone();
 
-    let hash: HashSet<Employee> = HashSet::from_iter(res);
-    app.emergency.all_employees_hash = hash;
+            let hash: HashSet<Employee> = HashSet::from_iter(res);
+            app.emergency.all_employees_hash = hash;
+        }
+        Base::IkramBase => {
+            let res = conn.query_map(
+            format!(
+                r#"
+                    SELECT id, name, department, title, expro_id, field, category, in_base, in_ikram, last_timestamp FROM expro_employees
+                    WHERE in_ikram={};
+                "#,
+                    1
+            ),
+            |(id, name, department, title, expro_id, field, category, in_base, in_ikram, last_timestamp)| {
+                Employee {
+                    id,
+                    name,
+                    department,
+                    title,
+                    expro_id,
+                    field,
+                    category,
+                    in_base,
+                    in_ikram,
+                    last_timestamp
+                }
+            }
+    )?;
+            app.emergency.on_base_total = res.len();
+            //app.emergency.on_base_list = res.clone();
 
+            let hash: HashSet<Employee> = HashSet::from_iter(res);
+            app.emergency.all_employees_hash = hash;
+        }
+    }
     Ok(())
 }
 
@@ -900,12 +1012,12 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_base, last_timestamp FROM expro_employees
+                SELECT id, name, department, title, expro_id, field, category, in_base, in_ikram, last_timestamp FROM expro_employees
                 WHERE id={};
             "#,
             app.input_result
             ),
-            |(id, name, department, title, expro_id, field, category, in_base, last_timestamp)| {
+            |(id, name, department, title, expro_id, field, category, in_base, in_ikram, last_timestamp)| {
                 Employee {
                     id,
                     name,
@@ -915,6 +1027,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                     field,
                     category,
                     in_base,
+                    in_ikram,
                     last_timestamp
                 }
             }
@@ -924,60 +1037,124 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         let timestamp = chrono::Local::now().naive_local().and_utc().timestamp();
         let mut employee_query_result = res[0].clone();
 
-        app.scanned_employee_name = employee_query_result.name.clone();
+        app.scanned_employee.employee_name = employee_query_result.name.clone();
         // During emergencies we no longer update the employee status
         // but we push the employee id into the emergency hash for counting.
-        if app.is_emergency {
-            if employee_query_result.in_base == 0 {
-                return Err(anyhow!("The employee is not inside the base."));
-            }
-            // We check if the employee has already been counted in the drill.
-            let mut exists = false;
-            for employee in app.emergency.present_employees_hash.iter() {
-                if employee.id == employee_query_result.id {
-                    exists = true;
-                }
-            }
-            if !exists {
-                // If the employee has not been counted we push them to the present list.
-                app.emergency
-                    .present_employees_hash
-                    .insert(employee_query_result.clone());
-            } else {
-                return Err(anyhow!("The employee has already been counted."));
-            }
-        } else {
-            let duration_since = timestamp - employee_query_result.last_timestamp as i64;
+        match app.current_base {
+            Base::MainBase => {
+                if app.is_emergency {
+                    if employee_query_result.in_base == 0 {
+                        return Err(anyhow!("The employee is not inside the base."));
+                    }
+                    // We check if the employee has already been counted in the drill.
+                    let mut exists = false;
+                    for employee in app.emergency.present_employees_hash.iter() {
+                        if employee.id == employee_query_result.id {
+                            exists = true;
+                        }
+                    }
+                    if !exists {
+                        // If the employee has not been counted we push them to the present list.
+                        app.emergency
+                            .present_employees_hash
+                            .insert(employee_query_result.clone());
+                    } else {
+                        return Err(anyhow!("The employee has already been counted."));
+                    }
+                } else {
+                    let duration_since = timestamp - employee_query_result.last_timestamp as i64;
 
-            if duration_since >= 10 {
-                if employee_query_result.in_base == 0 {
-                    let _update_res = conn.exec_drop(
-                        format!(
-                            "UPDATE expro_employees
+                    if duration_since >= 10 {
+                        if employee_query_result.in_base == 0 {
+                            let _update_res = conn.exec_drop(
+                                format!(
+                                    "UPDATE expro_employees
                             SET in_base=1, last_timestamp={}
                             WHERE id={}",
-                            timestamp, employee_query_result.id
-                        ),
-                        (),
-                    )?;
+                                    timestamp, employee_query_result.id
+                                ),
+                                (),
+                            )?;
 
-                    employee_query_result.in_base = 1;
-                    employee_query_result.last_timestamp = timestamp as usize;
-                    app.employee_buffer.push(employee_query_result);
-                } else {
-                    let _update_res = conn.exec_drop(
-                        format!(
-                            "UPDATE expro_employees
+                            employee_query_result.in_base = 1;
+                            app.scanned_employee.status = "  IN  ".to_string();
+                            employee_query_result.last_timestamp = timestamp as usize;
+                            app.employee_buffer.push(employee_query_result);
+                        } else {
+                            let _update_res = conn.exec_drop(
+                                format!(
+                                    "UPDATE expro_employees
                             SET in_base=0, last_timestamp={}
                             WHERE id={}",
-                            timestamp, employee_query_result.id
-                        ),
-                        (),
-                    )?;
+                                    timestamp, employee_query_result.id
+                                ),
+                                (),
+                            )?;
 
-                    employee_query_result.in_base = 0;
-                    employee_query_result.last_timestamp = timestamp as usize;
-                    app.employee_buffer.push(employee_query_result);
+                            employee_query_result.in_base = 0;
+                            app.scanned_employee.status = "  OUT  ".to_string();
+                            employee_query_result.last_timestamp = timestamp as usize;
+                            app.employee_buffer.push(employee_query_result);
+                        }
+                    }
+                }
+            }
+            Base::IkramBase => {
+                if app.is_emergency {
+                    if employee_query_result.in_ikram == 0 {
+                        return Err(anyhow!("The employee is not inside the base."));
+                    }
+                    // We check if the employee has already been counted in the drill.
+                    let mut exists = false;
+                    for employee in app.emergency.present_employees_hash.iter() {
+                        if employee.id == employee_query_result.id {
+                            exists = true;
+                        }
+                    }
+                    if !exists {
+                        // If the employee has not been counted we push them to the present list.
+                        app.emergency
+                            .present_employees_hash
+                            .insert(employee_query_result.clone());
+                    } else {
+                        return Err(anyhow!("The employee has already been counted."));
+                    }
+                } else {
+                    let duration_since = timestamp - employee_query_result.last_timestamp as i64;
+
+                    if duration_since >= 10 {
+                        if employee_query_result.in_ikram == 0 {
+                            let _update_res = conn.exec_drop(
+                                format!(
+                                    "UPDATE expro_employees
+                                    SET in_ikram=1, last_timestamp={}
+                                    WHERE id={}",
+                                    timestamp, employee_query_result.id
+                                ),
+                                (),
+                            )?;
+
+                            employee_query_result.in_ikram = 1;
+                            app.scanned_employee.status = "  IN  ".to_string();
+                            employee_query_result.last_timestamp = timestamp as usize;
+                            app.employee_buffer.push(employee_query_result);
+                        } else {
+                            let _update_res = conn.exec_drop(
+                                format!(
+                                    "UPDATE expro_employees
+                                    SET in_ikram=0, last_timestamp={}
+                                    WHERE id={}",
+                                    timestamp, employee_query_result.id
+                                ),
+                                (),
+                            )?;
+
+                            employee_query_result.in_ikram = 0;
+                            app.scanned_employee.status = "  OUT  ".to_string();
+                            employee_query_result.last_timestamp = timestamp as usize;
+                            app.employee_buffer.push(employee_query_result);
+                        }
+                    }
                 }
             }
         }
