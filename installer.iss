@@ -22,6 +22,7 @@ AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName="C:\{#MyAppName}"
+UsePreviousAppDir=no
 UninstallDisplayIcon={app}\{#MyAppExeName}
 ; "ArchitecturesAllowed=x64compatible" specifies that Setup cannot run
 ; on anything but x64 and Windows 11 on Arm.
@@ -33,7 +34,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
-LicenseFile=C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\New folder\Code\tcard\EULA.txt
+LicenseFile=C:\Users\crimsondamask\Desktop\rust\tcard\EULA.txt
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
 SolidCompression=yes
@@ -46,13 +47,13 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\New folder\Code\tcard\target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\New folder\Code\tcard\employee_table.csv"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\New folder\Code\tcard\typst.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\New folder\Code\tcard\template.typ"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\script.sql"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\Expro DataSBASE New.xlsx"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\EDGEOPS\OneDrive - Expro Americas LLC\Desktop\New folder\Code\tcard\assets\icon.ico"; DestDir: "{app}"
+Source: "C:\Users\crimsondamask\Desktop\rust\tcard\target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\crimsondamask\Desktop\rust\tcard\employee_table.csv"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\crimsondamask\Desktop\rust\tcard\typst.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\crimsondamask\Desktop\rust\tcard\template.typ"; DestDir: "{app}"; Flags: ignoreversion
+
+
+Source: "C:\Users\crimsondamask\Desktop\rust\tcard\assets\icon.ico"; DestDir: "{app}"
 
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
