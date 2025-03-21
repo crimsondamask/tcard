@@ -10,8 +10,8 @@ use std::{collections::HashSet, fmt::Display, io::Write, sync::Arc};
 
 use chrono::DateTime;
 use egui::{
-    style::Selection, Button, Color32, ComboBox, CornerRadius, Label, RichText, Stroke, TextEdit,
-    Vec2, Visuals,
+    style::Selection, Button, Color32, ComboBox, CornerRadius, Label, RichText, Stroke, TextBuffer,
+    TextEdit, Vec2, Visuals,
 };
 use egui_extras::{Column, TableBuilder};
 
@@ -283,20 +283,22 @@ impl eframe::App for TemplateApp {
                                 .italics(),
                         ));
                     }
-                    ComboBox::from_label("Base:")
-                        .selected_text(format!("{}", self.current_base))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.current_base,
-                                Base::MainBase,
-                                "Main Base",
-                            );
-                            ui.selectable_value(
-                                &mut self.current_base,
-                                Base::IkramBase,
-                                "Ikram Base",
-                            );
-                        });
+                    self.current_base = Base::MainBase;
+                    ui.label(format!("{}", self.current_base));
+                    // ComboBox::from_label("Base:")
+                    //     .selected_text(format!("{}", self.current_base))
+                    //     .show_ui(ui, |ui| {
+                    //         ui.selectable_value(
+                    //             &mut self.current_base,
+                    //             Base::MainBase,
+                    //             "Main Base",
+                    //         );
+                    //         ui.selectable_value(
+                    //             &mut self.current_base,
+                    //             Base::IkramBase,
+                    //             "Ikram Base",
+                    //         );
+                    //     });
                 });
             });
         });
@@ -862,6 +864,8 @@ impl eframe::App for TemplateApp {
     }
 }
 fn generate_report(app: &mut TemplateApp) -> Result<()> {
+    let datetime = chrono::Local::now();
+    let date_str = datetime.naive_local().and_utc().format("%d-%m-%Y %H:%M");
     let mut template_str = r#"
  
                             #set page(paper: "a4", margin: (
@@ -908,7 +912,28 @@ fn generate_report(app: &mut TemplateApp) -> Result<()> {
     for missing in app.emergency.missing_list.clone() {
         let typst_string = format!(
             "\n[{}], [{}], [{}], [{}], [MISSING],",
-            missing.id, missing.name, missing.department, missing.title
+            missing.id,
+            missing
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            missing
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            missing
+                .title
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
         );
         template_str.push_str(&typst_string);
     }
@@ -917,6 +942,8 @@ fn generate_report(app: &mut TemplateApp) -> Result<()> {
           )
         "#,
     );
+
+    template_str.push_str(format!("Report date: {}", date_str).as_str());
 
     let mut file = std::fs::File::options()
         .write(true)

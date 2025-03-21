@@ -41,8 +41,10 @@
 
                                                                                                       table.header[ID][Name][Department][Function][Status],
                                 
-[5008000308353], [KARAOUI Nabil], [EXPRO HMD BASE 1], [Welder], [MISSING],
-[500800024811], [ABDELAIDOUM  Abdelhakim], [Production], [MPP Senior Field Technician 3], [MISSING],
-[5008000100279], [ABDENNOURI Tarek], [Supply Chain], [Logistics Coordinator 2], [MISSING],
+[500800009716], [LAKRIB  Kamel], [WellTest], [ Welltest  Senior Field Technician 2], [MISSING],
+[5008000308037], [Abbas Ali], [Welltest], [Driver ], [MISSING],
+[5008005000010], [Visiteur 10], [], [], [MISSING],
+[5008006000011], [Visiteur 11], [], [], [MISSING],
+[500800016716], [LAKEHAL  Fares], [WellTest], [ Welltest Senior Field Technician 2], [MISSING],
           )
-        
+        Report date: 21-03-2025 12:29
