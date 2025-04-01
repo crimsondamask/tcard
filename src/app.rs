@@ -286,7 +286,7 @@ impl eframe::App for TemplateApp {
                                 .italics(),
                         ));
                     }
-                    self.current_base = Base::IkramBase;
+                    self.current_base = Base::MainBase;
                     ui.label(format!("{}", self.current_base));
                     // ComboBox::from_label("Base:")
                     //     .selected_text(format!("{}", self.current_base))
