@@ -73,6 +73,8 @@ struct Emergency {
 pub struct TemplateApp {
     // Example stuff:
     #[serde(skip)] // This how you opt-out of serialization of a field
+    scroll_up: bool,
+    #[serde(skip)] // This how you opt-out of serialization of a field
     last_log_dump: i64,
     current_base: Base,
     #[serde(skip)] // This how you opt-out of serialization of a field
@@ -115,6 +117,7 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
+            scroll_up: false,
             last_log_dump: 0,
             current_base: Base::MainBase,
             log_dump_debounced: false,
@@ -389,7 +392,7 @@ impl eframe::App for TemplateApp {
             if self.is_emergency && (self.emergency.missing_list.len() > 0) && self.count_pressed {
                 ui.heading("Missing List");
                 let available_height = ui.available_height();
-                let table = TableBuilder::new(ui)
+                let mut table = TableBuilder::new(ui)
                     .striped(true)
                     .resizable(true)
                     .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
@@ -406,6 +409,10 @@ impl eframe::App for TemplateApp {
                     .vscroll(true)
                     .min_scrolled_height(0.0)
                     .max_scroll_height(available_height);
+                if self.scroll_up {
+                    table = table.scroll_to_row(1, Some(egui::Align::Center));
+                    self.scroll_up = false;
+                }
 
                 table
                     .header(40.0, |mut header| {
@@ -493,7 +500,7 @@ impl eframe::App for TemplateApp {
             } else if self.is_emergency {
                 ui.heading("Employee Count List");
                 let available_height = ui.available_height();
-                let table = TableBuilder::new(ui)
+                let mut table = TableBuilder::new(ui)
                     .striped(true)
                     .column(Column::auto())
                     .column(Column::auto())
@@ -511,6 +518,10 @@ impl eframe::App for TemplateApp {
                     .min_scrolled_height(0.0)
                     .max_scroll_height(available_height);
 
+                if self.scroll_up {
+                    table = table.scroll_to_row(1, Some(egui::Align::Center));
+                    self.scroll_up = false;
+                }
                 table
                     .header(40.0, |mut header| {
                         header.col(|ui| {
@@ -598,9 +609,9 @@ impl eframe::App for TemplateApp {
                     });
             } else {
                 let available_height = ui.available_height();
-                let table = TableBuilder::new(ui)
+                let mut table = TableBuilder::new(ui)
                     .striped(true)
-                    .stick_to_bottom(true)
+                    //.stick_to_bottom(true)
                     //.scroll_to_row(self.employee_buffer.len(), Some(egui::Align::BOTTOM))
                     .resizable(true)
                     .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
@@ -617,11 +628,17 @@ impl eframe::App for TemplateApp {
                     .vscroll(true)
                     .min_scrolled_height(0.0)
                     .max_scroll_height(available_height);
+                if self.scroll_up {
+                    table = table.scroll_to_row(1, Some(egui::Align::Center));
+                    self.scroll_up = false;
+                }
 
                 table
                     .header(40.0, |mut header| {
                         header.col(|ui| {
-                            ui.strong("INDEX");
+                            if ui.small_button("UP").clicked() {
+                                self.scroll_up = true;
+                            }
                         });
                         header.col(|ui| {
                             ui.strong("ID");
@@ -1065,6 +1082,8 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         let mut employee_query_result = res[0].clone();
 
         app.scanned_employee.employee_name = employee_query_result.name.clone();
+        // We set the employee_is_scanned field to make the table scroll up.
+        app.scroll_up = true;
         // During emergencies we no longer update the employee status
         // but we push the employee id into the emergency hash for counting.
         match app.current_base {
