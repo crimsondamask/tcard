@@ -1,17 +1,17 @@
 //use rusqlite::Connection;
-
 use anyhow::{anyhow, Result};
+use rodio::*;
 //use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender};
 use mysql::prelude::*;
 use mysql::*;
 //use sqlx::mysql::MySqlPool;
-use std::{collections::HashSet, fmt::Display, io::Write, sync::Arc};
+use std::{collections::HashSet, fmt::Display, io::Write, sync::Arc, time::Duration};
 
 use chrono::DateTime;
 use egui::{
-    style::Selection, Button, Color32, ComboBox, CornerRadius, Label, RichText, Stroke, TextBuffer,
-    TextEdit, Vec2, Visuals,
+    style::Selection, Button, Color32, CornerRadius, Label, RichText, Stroke, TextEdit, Vec2,
+    Visuals,
 };
 use egui_extras::{Column, TableBuilder};
 
@@ -286,7 +286,7 @@ impl eframe::App for TemplateApp {
                                 .italics(),
                         ));
                     }
-                    self.current_base = Base::MainBase;
+                    self.current_base = Base::IkramBase;
                     ui.label(format!("{}", self.current_base));
                     // ComboBox::from_label("Base:")
                     //     .selected_text(format!("{}", self.current_base))
@@ -901,7 +901,7 @@ fn generate_report(app: &mut TemplateApp) -> Result<()> {
                                                                           }, )
 
 
-                                                                          #set text(font: "Arial", size: 6pt)
+                                                                          #set text(font: "Arial", size: 8pt)
 
                                                                           // Medium bold table header.
                                                                           #show table.cell.where(y: 0): set text(weight: "medium")
@@ -1090,6 +1090,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
             Base::MainBase => {
                 if app.is_emergency {
                     if employee_query_result.in_base == 0 {
+                        play_error_sound()?;
                         return Err(anyhow!("The employee is not inside the base."));
                     }
                     // We check if the employee has already been counted in the drill.
@@ -1104,7 +1105,9 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         app.emergency
                             .present_employees_hash
                             .insert(employee_query_result.clone());
+                        play_ok_sound()?;
                     } else {
+                        play_error_sound()?;
                         return Err(anyhow!("The employee has already been counted."));
                     }
                 } else {
@@ -1142,12 +1145,14 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             employee_query_result.last_timestamp = timestamp as usize;
                             app.employee_buffer.push(employee_query_result);
                         }
+                        play_ok_sound()?;
                     }
                 }
             }
             Base::IkramBase => {
                 if app.is_emergency {
                     if employee_query_result.in_ikram == 0 {
+                        play_error_sound()?;
                         return Err(anyhow!("The employee is not inside the base."));
                     }
                     // We check if the employee has already been counted in the drill.
@@ -1162,7 +1167,9 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         app.emergency
                             .present_employees_hash
                             .insert(employee_query_result.clone());
+                        play_ok_sound()?;
                     } else {
+                        play_error_sound()?;
                         return Err(anyhow!("The employee has already been counted."));
                     }
                 } else {
@@ -1200,13 +1207,16 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             employee_query_result.last_timestamp = timestamp as usize;
                             app.employee_buffer.push(employee_query_result);
                         }
+                        play_ok_sound()?;
                     }
                 }
             }
         }
     } else if res.len() == 0 {
+        play_error_sound()?;
         return Err(anyhow!("Could not find ID in the database."));
     } else {
+        play_error_sound()?;
         return Err(anyhow!("More than one ID found in the database."));
     }
     Ok(())
@@ -1246,5 +1256,36 @@ fn dump_24h_log_file(app: &mut TemplateApp, timestamp: i64) -> Result<()> {
         file.write_all(buffer.as_bytes())?;
         app.employee_buffer.clear();
     }
+    Ok(())
+}
+
+fn play_ok_sound() -> Result<()> {
+    std::thread::spawn(move || {
+        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+
+        let file = std::fs::File::open("assets/ok.mp3").unwrap();
+        let beep1 = stream_handle
+            .play_once(std::io::BufReader::new(file))
+            .unwrap();
+        beep1.set_volume(0.9);
+        println!("Started beep1");
+        std::thread::sleep(Duration::from_millis(1000));
+    });
+
+    Ok(())
+}
+fn play_error_sound() -> Result<()> {
+    std::thread::spawn(move || {
+        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+
+        let file = std::fs::File::open("assets/error.mp3").unwrap();
+        let beep1 = stream_handle
+            .play_once(std::io::BufReader::new(file))
+            .unwrap();
+        beep1.set_volume(0.9);
+        println!("Started beep1");
+        std::thread::sleep(Duration::from_millis(1000));
+    });
+
     Ok(())
 }
