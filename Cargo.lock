@@ -1557,7 +1557,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "expro_access"
+name = "expro_canteen"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,5 +1,5 @@
 [package]
-name = "expro_access"
+name = "expro_canteen"
 version = "0.1.0"
 authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 edition = "2021"

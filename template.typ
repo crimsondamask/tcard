@@ -9,7 +9,7 @@
                                                   ), header: context {
                                                         [
 
-                                                                _Expro Emergency Access Report_
+                                                                _Expro Canteen Report_
                                                                     #h(1fr)
                                                                         #counter(page).display()
                                                                           ]
@@ -37,17 +37,64 @@
                                                                                               )
 
                                                                                               #table(
-                                                                                                    columns: (1fr, 1fr, 1fr, 1fr, 0.5fr),
+                                                                                                    columns: (1fr, 1fr, 1fr, 0.5fr, 0.5fr, 0.5fr),
 
-                                                                                                      table.header[ID][Name][Department][Function][Status],
+                                                                                                      table.header[ID][Name][Department][Breakfast][Lunch][Dinner],
                                 
-[500800020584], [ABOTRABA Mahmoud], [WellTest], [Workshop / Maintenance Supervisor ], [MISSING],
-[500800009716], [LAKRIB  Kamel], [WellTest], [ Welltest  Senior Field Technician 2], [MISSING],
-[5008006000011], [Visiteur 11], [], [], [MISSING],
-[500800011091993], [MADOUI Abdelkader], [DAQ  ], [DAQ Maintenance & PLC support Engineer], [MISSING],
-[5008005000010], [Visiteur 10], [], [], [MISSING],
-[500800024811], [ABDELAIDOUM  Abdelhakim], [Production], [MPP Senior Field Technician 3], [MISSING],
-[500800016716], [LAKEHAL  Fares], [WellTest], [ Welltest Senior Field Technician 2], [MISSING],
-[5008000308234], [ABBAS Karim], [Production], [Logistic and material coordinator], [MISSING],
+[500800011091993], [MADOUI Abdelkader], [DAQ  ], [1], [1], [1],
           )
-        Report date: 05-04-2025 17:37
+        
+            
+          // Medium bold table header.
+          #show table.cell.where(y: 0): set text(weight: "medium")
+
+          // Bold titles.
+
+          // See the strokes section for details on this!
+          #let frame(stroke) = (x, y) => (
+                left: if x > 0 { 0pt } else { stroke },
+                  right: stroke,
+                    top: if y < 2 { stroke } else { 0pt },
+                      bottom: stroke,
+                      )
+
+                      #set table(
+                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                              stroke: frame(rgb("21222C")),
+                              )
+
+                              #table(
+                                    columns: (1fr, 1fr, 1fr, 1fr),
+
+                                      table.header[Department][Breakfast][Lunch][Dinner],
+        [Area Support],[0],[0],[0],
+[BD],[0],[0],[0],
+[DAQ],[1],[1],[1],
+[DST],[0],[0],[0],
+[Facilities],[0],[0],[0],
+[Finance],[0],[0],[0],
+[Fluids],[0],[0],[0],
+[HR],[0],[0],[0],
+[QHSE],[0],[0],[0],
+[IT],[0],[0],[0],
+[L&D],[0],[0],[0],
+[Wireline],[0],[0],[0],
+[Meters],[0],[0],[0],
+[Production],[0],[0],[0],
+[OPS],[0],[0],[0],
+[Supply Chain],[0],[0],[0],
+[TRS],[0],[0],[0],
+[Welltest],[0],[0],[0],
+[Wireline],[0],[0],[0],
+
+          )
+        Report date: 10-06-2025 20:48
+
+Breakfast total: 1
+
+Lunch total: 1
+
+Dinner total: 1
+
+Dinner total: 1
+

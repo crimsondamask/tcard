@@ -18,9 +18,9 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Expro Access Control",
+        "Expro Canteen Control",
         native_options,
-        Box::new(|cc| Ok(Box::new(expro_access::TemplateApp::new(cc)))),
+        Box::new(|cc| Ok(Box::new(expro_canteen::TemplateApp::new(cc)))),
     )
 }
 

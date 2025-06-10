@@ -1,0 +1,55 @@
+
+ 
+                            #set page(paper: "a4", margin: (
+                              top: 3cm,
+                                bottom: 3cm,
+                                  left: 2cm, 
+                                right: 2cm,
+                                              x: 1cm,
+                                                  ), header: context {
+                                                        [
+
+                                                                _Expro Canteen Report_
+                                                                    #h(1fr)
+                                                                        #counter(page).display()
+                                                                          ]
+                                                                          }, )
+
+
+                                                                          #set text(font: "Arial", size: 8pt)
+
+                                                                          // Medium bold table header.
+                                                                          #show table.cell.where(y: 0): set text(weight: "medium")
+
+                                                                          // Bold titles.
+
+                                                                          // See the strokes section for details on this!
+                                                                          #let frame(stroke) = (x, y) => (
+                                                                                left: if x > 0 { 0pt } else { stroke },
+                                                                                  right: stroke,
+                                                                                    top: if y < 2 { stroke } else { 0pt },
+                                                                                      bottom: stroke,
+                                                                                      )
+
+                                                                                      #set table(
+                                                                                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                                                                                              stroke: frame(rgb("21222C")),
+                                                                                              )
+
+                                                                                              #table(
+                                                                                                    columns: (1fr, 1fr, 1fr, 0.5fr, 0.5fr, 0.5fr),
+
+                                                                                                      table.header[ID][Name][Department][Breakfast][Lunch][Dinner],
+                                
+[50080000301291], [Boudjella Mohamed Bilal], [Welltest], [0], [1], [0],
+[5008000308600], [BOUGHACHICHE RABAH BOUTELDJA], [Ikram Base], [0], [1], [0],
+[5008000308249], [CHABANE  Badreddine], [Production], [0], [1], [0],
+          )
+        Report date: 11-05-2025 15:23
+
+Breakfast total: 0
+
+Lunch total: 3
+
+Dinner total: 0
+
