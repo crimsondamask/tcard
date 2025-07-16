@@ -1,4 +1,3 @@
-//use rusqlite::Connection;
 use anyhow::{anyhow, Result};
 use rodio::*;
 //use anyhow::Result;
@@ -14,6 +13,10 @@ use egui::{
     Visuals,
 };
 use egui_extras::{Column, TableBuilder};
+
+const BREAKFAST: usize = 0;
+const LUNCH: usize = 1;
+const DINNER: usize = 2;
 
 #[derive(PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 enum Base {
@@ -57,6 +60,7 @@ struct Employee {
     expro_id: String,
     field: String,
     category: String,
+    in_base: usize,
     last_timestamp: usize,
     breakfast: usize,
     lunch: usize,
@@ -878,82 +882,23 @@ fn generate_report(app: &mut TemplateApp) -> Result<()> {
 fn generate_day_report(db_url: String) -> Result<()> {
     let datetime = chrono::Local::now();
     let date_str = datetime.naive_local().and_utc().format("%d-%m-%Y %H:%M");
-    let mut template_str = r#"
- 
-                            #set page(paper: "a4", margin: (
-                              top: 3cm,
-                                bottom: 3cm,
-                                  left: 2cm, 
-                                right: 2cm,
-                                              x: 1cm,
-                                                  ), header: context {
-                                                        [
 
-                                                                _Expro Canteen Report_
-                                                                    #h(1fr)
-                                                                        #counter(page).display()
-                                                                          ]
-                                                                          }, )
-
-
-                                                                          #set text(font: "Arial", size: 8pt)
-
-                                                                          // Medium bold table header.
-                                                                          #show table.cell.where(y: 0): set text(weight: "medium")
-
-                                                                          // Bold titles.
-
-                                                                          // See the strokes section for details on this!
-                                                                          #let frame(stroke) = (x, y) => (
-                                                                                left: if x > 0 { 0pt } else { stroke },
-                                                                                  right: stroke,
-                                                                                    top: if y < 2 { stroke } else { 0pt },
-                                                                                      bottom: stroke,
-                                                                                      )
-
-                                                                                      #set table(
-                                                                                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
-                                                                                              stroke: frame(rgb("21222C")),
-                                                                                              )
-
-                                                                                              #table(
-                                                                                                    columns: (1fr, 1fr, 1fr, 0.5fr, 0.5fr, 0.5fr),
-
-                                                                                                      table.header[ID][Name][Department][Breakfast][Lunch][Dinner],
-                                "#.to_owned();
+    let mut report_date = 0;
+    let mut list_string = String::new();
     let pool = Pool::new(db_url.as_str())?;
     let mut conn = pool.get_conn()?;
 
-    let res = conn.query_map(
-            format!(
-            r#"
-                SELECT id, name, department, title, expro_id, field, category, breakfast, lunch, dinner, last_timestamp FROM expro_employees
-                WHERE breakfast=1 OR lunch=1 OR dinner=1;
-            "#,
-            ),
-            |(id, name, department, title, expro_id, field, category, breakfast, lunch, dinner, last_timestamp)| {
-                Employee {
-                    id,
-                    name,
-                    department,
-                    title,
-                    expro_id,
-                    field,
-                    category,
-                    breakfast,
-                    lunch,
-                    dinner,
-                    last_timestamp
-                }
-            }
-    )?;
-
-    let mut csv_string = String::from("ID,NAME,DEPARTMENT,BREAKFAST,LUNCH,DINNER\n");
-    let mut breakfast_total = 0;
-    let mut lunch_total = 0;
-    let mut dinner_total = 0;
-
     let mut production_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut security = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut visitors = DepartmentCount {
         breakfast: 0,
         lunch: 0,
         dinner: 0,
@@ -1049,12 +994,149 @@ fn generate_day_report(db_url: String) -> Result<()> {
         dinner: 0,
     };
 
+    let res = conn.query_map(
+            format!(
+            r#"
+                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
+                WHERE breakfast=1 OR lunch=1 OR dinner=1;
+            "#,
+            ),
+            |(id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp)| {
+                Employee {
+                    id,
+                    name,
+                    department,
+                    title,
+                    expro_id,
+                    field,
+                    category,
+                    in_base,
+                    breakfast,
+                    lunch,
+                    dinner,
+                    last_timestamp
+                }
+            }
+    )?;
+
+    let mut csv_string = String::from("ID,NAME,DEPARTMENT,BREAKFAST,LUNCH,DINNER\n");
+    let mut breakfast_total = 0;
+    let mut lunch_total = 0;
+    let mut dinner_total = 0;
+
+    let mut admin_list: Vec<Employee> = Vec::new();
+    let mut security_list: Vec<Employee> = Vec::new();
+    let mut visitors_list: Vec<Employee> = Vec::new();
+    let mut bd_list: Vec<Employee> = Vec::new();
+    let mut daq_list: Vec<Employee> = Vec::new();
+    let mut dst_list: Vec<Employee> = Vec::new();
+    let mut facilities_list: Vec<Employee> = Vec::new();
+    let mut finance_list: Vec<Employee> = Vec::new();
+    let mut fluids_list: Vec<Employee> = Vec::new();
+    let mut hr_list: Vec<Employee> = Vec::new();
+    let mut hseq_list: Vec<Employee> = Vec::new();
+    let mut it_list: Vec<Employee> = Vec::new();
+    let mut learning_and_dev_list: Vec<Employee> = Vec::new();
+    let mut wireline_list: Vec<Employee> = Vec::new();
+    let mut meters_list: Vec<Employee> = Vec::new();
+    let mut ops_list: Vec<Employee> = Vec::new();
+    let mut production_list: Vec<Employee> = Vec::new();
+    let mut supply_chain_list: Vec<Employee> = Vec::new();
+    let mut welltest_list: Vec<Employee> = Vec::new();
+    let mut trs_list: Vec<Employee> = Vec::new();
+
     for entry in res {
+        report_date = entry.last_timestamp;
+
+        match entry.department.to_lowercase().trim() {
+            "area support" => {
+                admin_list.push(entry.clone());
+            }
+            "expro hmd base 1" => {
+                security_list.push(entry.clone());
+            }
+            "expro hmd base 2" => {
+                security_list.push(entry.clone());
+            }
+            "visitors" => {
+                visitors_list.push(entry.clone());
+            }
+            "bd" => {
+                bd_list.push(entry.clone());
+            }
+            "daq" => {
+                daq_list.push(entry.clone());
+            }
+            "dst" => {
+                dst_list.push(entry.clone());
+            }
+            "facilities" => {
+                facilities_list.push(entry.clone());
+            }
+            "finance" => {
+                finance_list.push(entry.clone());
+            }
+            "fluids" => {
+                fluids_list.push(entry.clone());
+            }
+            "hr" => {
+                hr_list.push(entry.clone());
+            }
+            "hseq" => {
+                hseq_list.push(entry.clone());
+            }
+            "qhse" => {
+                hseq_list.push(entry.clone());
+            }
+            "it" => {
+                it_list.push(entry.clone());
+            }
+            "l&d" => {
+                learning_and_dev_list.push(entry.clone());
+            }
+            "logging" => {
+                wireline_list.push(entry.clone());
+            }
+            "meters" => {
+                meters_list.push(entry.clone());
+            }
+            "production" => {
+                production_list.push(entry.clone());
+            }
+            "sampling" => {
+                daq_list.push(entry.clone());
+            }
+            "production operations" => {
+                ops_list.push(entry.clone());
+            }
+            "supply chain" => {
+                supply_chain_list.push(entry.clone());
+            }
+            "trs / wc" => {
+                trs_list.push(entry.clone());
+            }
+            "welltest" => {
+                welltest_list.push(entry.clone());
+            }
+            "wireline" => {
+                wireline_list.push(entry.clone());
+            }
+            _ => {}
+        }
         if entry.breakfast == 1 {
             breakfast_total += 1;
             match entry.department.to_lowercase().trim() {
                 "area support" => {
                     admin_count.breakfast += 1;
+                }
+                "expro hmd base 1" => {
+                    security.breakfast += 1;
+                }
+                "expro hmd base 2" => {
+                    security.breakfast += 1;
+                }
+                "visitors" => {
+                    visitors.breakfast += 1;
                 }
                 "bd" => {
                     bd_count.breakfast += 1;
@@ -1126,6 +1208,15 @@ fn generate_day_report(db_url: String) -> Result<()> {
                 "area support" => {
                     admin_count.lunch += 1;
                 }
+                "expro hmd base 1" => {
+                    security.lunch += 1;
+                }
+                "expro hmd base 2" => {
+                    security.lunch += 1;
+                }
+                "visitors" => {
+                    visitors.lunch += 1;
+                }
                 "bd" => {
                     bd_count.lunch += 1;
                 }
@@ -1195,6 +1286,15 @@ fn generate_day_report(db_url: String) -> Result<()> {
             match entry.department.to_lowercase().trim() {
                 "area support" => {
                     admin_count.dinner += 1;
+                }
+                "expro hmd base 1" => {
+                    security.dinner += 1;
+                }
+                "expro hmd base 2" => {
+                    security.dinner += 1;
+                }
+                "visitors" => {
+                    visitors.dinner += 1;
                 }
                 "bd" => {
                     bd_count.dinner += 1;
@@ -1280,7 +1380,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
             entry.lunch,
             entry.dinner,
         );
-        template_str.push_str(&typst_string);
+        list_string.push_str(&typst_string);
 
         let csv_str = format!(
             "{},{},{},{},{},{},\n",
@@ -1293,40 +1393,52 @@ fn generate_day_report(db_url: String) -> Result<()> {
         );
         csv_string.push_str(&csv_str);
     }
-    template_str.push_str(
-        r#"
-          )
-        "#,
-    );
 
-    template_str.push_str(
-        r#"
-            
-          // Medium bold table header.
-          #show table.cell.where(y: 0): set text(weight: "medium")
+    // First table
 
-          // Bold titles.
+    let mut template_str = r#"
+ 
+                            #set page(paper: "a4", margin: (
+                              top: 3cm,
+                                bottom: 3cm,
+                                  left: 2cm, 
+                                right: 2cm,
+                                              x: 1cm,
+                                                  ), header: context {
+                                                        [
 
-          // See the strokes section for details on this!
-          #let frame(stroke) = (x, y) => (
-                left: if x > 0 { 0pt } else { stroke },
-                  right: stroke,
-                    top: if y < 2 { stroke } else { 0pt },
-                      bottom: stroke,
-                      )
+                                                                _Expro Canteen Report_
+                                                                    #h(1fr)
+                                                                        #counter(page).display()
+                                                                          ]
+                                                                          }, )
 
-                      #set table(
-                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
-                              stroke: frame(rgb("21222C")),
-                              )
 
-                              #table(
-                                    columns: (1fr, 1fr, 1fr, 1fr),
+                                                                          #set text(font: "Arial", size: 8pt)
 
-                                      table.header[Department][Breakfast][Lunch][Dinner],
-        "#,
-    );
+                                                                          // Medium bold table header.
+                                                                          #show table.cell.where(y: 0): set text(weight: "medium")
 
+                                                                          // Bold titles.
+
+                                                                          // See the strokes section for details on this!
+                                                                          #let frame(stroke) = (x, y) => (
+                                                                                left: if x > 0 { 0pt } else { stroke },
+                                                                                  right: stroke,
+                                                                                    top: if y < 2 { stroke } else { 0pt },
+                                                                                      bottom: stroke,
+                                                                                      )
+
+                                                                                      #set table(
+                                                                                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                                                                                              stroke: frame(rgb("21222C")),
+                                                                                              )
+
+                                                                                              #table(
+
+                                                                                                    columns: (1fr, 1fr, 1fr, 1fr),
+                                                                                                  table.header[Department][Breakfast][Lunch][Dinner],
+                                "#.to_owned();
     template_str.push_str(
         format!(
             "[Area Support],[{}],[{}],[{}],\n",
@@ -1461,16 +1573,568 @@ fn generate_day_report(db_url: String) -> Result<()> {
         .as_str(),
     );
     template_str.push_str(
+        format!(
+            "[Security],[{}],[{}],[{}],\n",
+            security.breakfast, security.lunch, security.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
         r#"
           )
         "#,
     );
 
-    template_str.push_str(format!("Report date: {}\n\n", date_str).as_str());
+    if let Some(date_time_report) = DateTime::from_timestamp(report_date as i64, 0) {
+        template_str
+            .push_str(format!("Report date: {}\n\n", date_time_report.format("%d/%m/%Y")).as_str());
+    }
     template_str.push_str(format!("Breakfast total: {}\n\n", breakfast_total).as_str());
     template_str.push_str(format!("Lunch total: {}\n\n", lunch_total).as_str());
     template_str.push_str(format!("Dinner total: {}\n\n", dinner_total).as_str());
-    template_str.push_str(format!("Dinner total: {}\n\n", dinner_total).as_str());
+    template_str.push_str(
+        format!(
+            "Total Meals: {}\n\n",
+            dinner_total + lunch_total + breakfast_total
+        )
+        .as_str(),
+    );
+    // Second table.
+    template_str.push_str(
+        r#"
+            
+          // Medium bold table header.
+          #show table.cell.where(y: 0): set text(weight: "medium")
+
+          // Bold titles.
+
+          // See the strokes section for details on this!
+          #let frame(stroke) = (x, y) => (
+                left: if x > 0 { 0pt } else { stroke },
+                  right: stroke,
+                    top: if y < 2 { stroke } else { 0pt },
+                      bottom: stroke,
+                      )
+
+                      #set table(
+                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                              stroke: frame(rgb("21222C")),
+                              )
+
+                              #table(
+                                        columns: (1fr, 1fr, 1fr, 0.5fr, 0.5fr, 0.5fr),
+
+                                      table.header[ID][Name][Department][Breakfast][Lunch][Dinner],
+        "#,
+    );
+
+    // template_str.push_str(&list_string);
+    for employee in admin_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in security_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in visitors_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in bd_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in daq_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in dst_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in facilities_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in finance_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in fluids_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in hr_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in hseq_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in it_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in learning_and_dev_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in wireline_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in meters_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in ops_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in production_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in supply_chain_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in welltest_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in trs_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.breakfast,
+            employee.lunch,
+            employee.dinner,
+        );
+
+        template_str.push_str(&row_string);
+    }
+
+    template_str.push_str(
+        r#"
+          )
+        "#,
+    );
 
     let mut file = std::fs::File::options()
         .write(true)
@@ -1489,12 +2153,23 @@ fn generate_day_report(db_url: String) -> Result<()> {
     let _compile_cmd = std::process::Command::new("cmd")
         .args([
             "/C",
-            format!("typst.exe compile template.typ {}.pdf", csv_date_str).as_str(),
+            format!(
+                "typst.exe compile template.typ C:\\Users\\Public\\Documents\\{}.pdf --open",
+                csv_date_str
+            )
+            .as_str(),
         ])
         .output()?;
-    let _pdf_open_cmd = std::process::Command::new("cmd")
-        .args(["/C", format!("start {}.pdf", csv_date_str).as_str()])
-        .output()?;
+    // let _pdf_open_cmd = std::process::Command::new("cmd")
+    //     .args([
+    //         "/C",
+    //         format!(
+    //             "start  C:\\Users\\Public\\Documents\\CanteenReports\\{}.pdf",
+    //             csv_date_str
+    //         )
+    //         .as_str(),
+    //     ])
+    //     .output()?;
 
     Ok(())
 }
@@ -1522,12 +2197,12 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, breakfast, lunch, dinner, last_timestamp FROM expro_employees
+                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
                 WHERE id={};
             "#,
             app.input_result
             ),
-            |(id, name, department, title, expro_id, field, category, breakfast, lunch, dinner, last_timestamp)| {
+            |(id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp)| {
                 Employee {
                     id,
                     name,
@@ -1536,6 +2211,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                     expro_id,
                     field,
                     category,
+                    in_base,
                     breakfast,
                     lunch,
                     dinner,
@@ -1557,9 +2233,20 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
         let duration_since = timestamp - employee_query_result.last_timestamp as i64;
 
         if duration_since >= 10 {
+            if employee_query_result.in_base == 0 {
+                play_error_sound()?;
+                return Err(anyhow!("ID has not been scanned at the gate."));
+            }
             match app.meal {
                 Meal::Breakfast => {
-                    if employee_query_result.breakfast == 0 {
+                    if (employee_query_result.breakfast == 0)
+                        && (employee_query_result.department.to_lowercase() != "expro hmd 1")
+                        && (employee_query_result.department.to_lowercase() != "expro hmd 2")
+                        && (employee_query_result.department.to_lowercase() != "ikram base")
+                        && (employee_query_result.department.to_lowercase() != "kamato")
+                        && (employee_query_result.department.to_lowercase() != "fca")
+                        && (employee_query_result.in_base != 0)
+                    {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
@@ -1572,14 +2259,27 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
 
                         employee_query_result.breakfast = 1;
                         employee_query_result.last_timestamp = timestamp as usize;
-                        app.employee_buffer.push(employee_query_result);
+                        app.employee_buffer.push(employee_query_result.clone());
+
+                        let _update_res = conn.exec_drop(format!(
+                            "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
+                             VALUES(?, ?, ?, ?, ?, ?, ?);",
+                            ),
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
                     }
                 }
                 Meal::Lunch => {
-                    if employee_query_result.lunch == 0 {
+                    if (employee_query_result.lunch == 0)
+                        && (employee_query_result.department.to_lowercase() != "expro hmd 1")
+                        && (employee_query_result.department.to_lowercase() != "expro hmd 2")
+                        && (employee_query_result.department.to_lowercase() != "ikram base")
+                        && (employee_query_result.department.to_lowercase() != "kamato")
+                        && (employee_query_result.department.to_lowercase() != "fca")
+                        && (employee_query_result.in_base != 0)
+                    {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
@@ -1592,14 +2292,27 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
 
                         employee_query_result.lunch = 1;
                         employee_query_result.last_timestamp = timestamp as usize;
-                        app.employee_buffer.push(employee_query_result);
+                        app.employee_buffer.push(employee_query_result.clone());
+
+                        let _update_res = conn.exec_drop(format!(
+                            "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
+                             VALUES(?, ?, ?, ?, ?, ?, ?);",
+                            ),
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
                     }
                 }
                 Meal::Dinner => {
-                    if employee_query_result.dinner == 0 {
+                    if (employee_query_result.dinner == 0)
+                        && (employee_query_result.department.to_lowercase() != "expro hmd 1")
+                        && (employee_query_result.department.to_lowercase() != "expro hmd 2")
+                        && (employee_query_result.department.to_lowercase() != "ikram base")
+                        && (employee_query_result.department.to_lowercase() != "kamato")
+                        && (employee_query_result.department.to_lowercase() != "fca")
+                        && (employee_query_result.in_base != 0)
+                    {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
@@ -1612,7 +2325,12 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
 
                         employee_query_result.dinner = 1;
                         employee_query_result.last_timestamp = timestamp as usize;
-                        app.employee_buffer.push(employee_query_result);
+                        app.employee_buffer.push(employee_query_result.clone());
+                        let _update_res = conn.exec_drop(format!(
+                            "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
+                             VALUES(?, ?, ?, ?, ?, ?, ?);",
+                            ),
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
