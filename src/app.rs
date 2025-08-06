@@ -52,6 +52,14 @@ struct CheckError {
     err_msg: String,
 }
 #[derive(Debug, Hash, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+struct ReportEntry {
+    id: String,
+    name: String,
+    department: String,
+    title: String,
+    meal: usize,
+}
+#[derive(Debug, Hash, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 struct Employee {
     id: String,
     name: String,
@@ -100,6 +108,8 @@ pub struct TemplateApp {
     // Example stuff:
     #[serde(skip)] // This how you opt-out of serialization of a field
     option_menu_open: bool,
+    start_date_for_report: String,
+    end_date_for_report: String,
     meal: Meal,
     #[serde(skip)] // This how you opt-out of serialization of a field
     scroll_up: bool,
@@ -148,6 +158,8 @@ impl Default for TemplateApp {
         Self {
             meal: Meal::Breakfast,
             option_menu_open: false,
+            start_date_for_report: String::from("2025/08/06 00:00:00 +0000"),
+            end_date_for_report: String::from("2025/08/07 00:00:00 +0000"),
             scroll_up: false,
             last_log_dump: 0,
             current_base: Base::MainBase,
@@ -330,8 +342,18 @@ impl eframe::App for TemplateApp {
                             self.employee_buffer.clear();
                         }
                         ui.end_row();
-                        if ui.button("Generate Day Report").clicked() {
-                            match generate_day_report(self.db_url.clone()) {
+                        ui.label("Start Date:");
+                        ui.text_edit_singleline(&mut self.start_date_for_report);
+                        ui.end_row();
+                        ui.label("End Date:");
+                        ui.text_edit_singleline(&mut self.end_date_for_report);
+                        ui.end_row();
+                        if ui.button("Generate Report").clicked() {
+                            match generate_report_by_date(
+                                self.db_url.clone(),
+                                self.start_date_for_report.clone(),
+                                self.end_date_for_report.clone(),
+                            ) {
                                 Ok(_) => {
                                     self.id_check.is_error = false;
                                     self.id_check.err_msg = "".to_owned();
@@ -348,7 +370,11 @@ impl eframe::App for TemplateApp {
                         .add(egui::Button::new("RESET DAY COUNT").fill(Color32::RED))
                         .clicked()
                     {
-                        match generate_day_report(self.db_url.clone()) {
+                        match generate_report_by_date(
+                            self.db_url.clone(),
+                            self.start_date_for_report.clone(),
+                            self.end_date_for_report.clone(),
+                        ) {
                             Ok(_) => {
                                 self.id_check.is_error = false;
                                 self.id_check.err_msg = "".to_owned();
@@ -997,8 +1023,8 @@ fn generate_day_report(db_url: String) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
-                WHERE breakfast=1 OR lunch=1 OR dinner=1;
+                SELECT id, name, department, title, expro_id, field, category, in_ikram, ikram_breakfast, ikram_lunch, ikram_dinner, last_timestamp FROM expro_employees
+                WHERE ikram_breakfast=1 OR ikram_lunch=1 OR ikram_dinner=1;
             "#,
             ),
             |(id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp)| {
@@ -1407,7 +1433,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
                                                   ), header: context {
                                                         [
 
-                                                                _Expro Canteen Report_
+                                                                _Expro Canteen Report Ikram Base_
                                                                     #h(1fr)
                                                                         #counter(page).display()
                                                                           ]
@@ -1533,7 +1559,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
     template_str.push_str(
         format!(
             "[Production],[{}],[{}],[{}],\n",
-            meters_count.breakfast, meters_count.lunch, meters_count.dinner
+            production_count.breakfast, production_count.lunch, production_count.dinner
         )
         .as_str(),
     );
@@ -2181,7 +2207,7 @@ fn reset_day(db_url: String) -> Result<()> {
     let _update_res = conn.exec_drop(
         format!(
             "UPDATE expro_employees
-                                SET breakfast=0, lunch=0, dinner=0;
+                                SET ikram_breakfast=0, ikram_lunch=0, ikram_dinner=0;
                                 ",
         ),
         (),
@@ -2197,7 +2223,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
+                SELECT id, name, department, title, expro_id, field, category, in_ikram, ikram_breakfast, ikram_lunch, ikram_dinner, last_timestamp FROM expro_employees
                 WHERE id={};
             "#,
             app.input_result
@@ -2250,7 +2276,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET breakfast=1, last_timestamp={}
+                                SET ikram_breakfast=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2265,7 +2291,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 0,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 1,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2283,7 +2309,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET lunch=1, last_timestamp={}
+                                SET ikram_lunch=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2298,7 +2324,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 0,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 1,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2316,7 +2342,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET dinner=1, last_timestamp={}
+                                SET ikram_dinner=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2330,7 +2356,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 0,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 1,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2414,6 +2440,1247 @@ fn play_error_sound() -> Result<()> {
         println!("Started beep1");
         std::thread::sleep(Duration::from_millis(1000));
     });
+
+    Ok(())
+}
+
+fn generate_report_by_date(
+    db_url: String,
+    start_date_string: String,
+    end_date_string: String,
+) -> Result<()> {
+    let datetime = chrono::Local::now();
+    let start_timestamp =
+        chrono::DateTime::parse_from_str(&start_date_string, "%Y/%m/%d %H:%M:%S %z")?.timestamp();
+    let end_timestamp =
+        chrono::DateTime::parse_from_str(&end_date_string, "%Y/%m/%d %H:%M:%S %z")?.timestamp();
+    println!("{start_timestamp}");
+    println!("{end_timestamp}");
+    let date_str = start_date_string.clone();
+    // let date_str = datetime.naive_local().and_utc().format("%d-%m-%Y %H:%M");
+
+    let mut report_date = 0;
+    let mut list_string = String::new();
+    let pool = Pool::new(db_url.as_str())?;
+    let mut conn = pool.get_conn()?;
+
+    let mut production_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut security = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut visitors = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut daq_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut welltest_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut meters_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut mpp_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut wireline_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut dst_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut lab_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut it_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut finance_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut admin_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut bd_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut facilities_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut hr_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut hseq_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut learning_and_dev = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut ops_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut supply_chain_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+    let mut trs_count = DepartmentCount {
+        breakfast: 0,
+        lunch: 0,
+        dinner: 0,
+    };
+
+    let res = conn.query_map(
+        format!(
+            r#"
+                SELECT id, name, department, title, meal FROM monthly
+                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=1;
+            "#,
+        ),
+        |(id, name, department, title, meal)| ReportEntry {
+            id,
+            name,
+            department,
+            title,
+            meal,
+        },
+    )?;
+
+    let mut csv_string = String::from("ID,NAME,DEPARTMENT,MEAL\n");
+    let mut breakfast_total = 0;
+    let mut lunch_total = 0;
+    let mut dinner_total = 0;
+
+    let mut admin_list: Vec<ReportEntry> = Vec::new();
+    let mut security_list: Vec<ReportEntry> = Vec::new();
+    let mut visitors_list: Vec<ReportEntry> = Vec::new();
+    let mut bd_list: Vec<ReportEntry> = Vec::new();
+    let mut daq_list: Vec<ReportEntry> = Vec::new();
+    let mut dst_list: Vec<ReportEntry> = Vec::new();
+    let mut facilities_list: Vec<ReportEntry> = Vec::new();
+    let mut finance_list: Vec<ReportEntry> = Vec::new();
+    let mut fluids_list: Vec<ReportEntry> = Vec::new();
+    let mut hr_list: Vec<ReportEntry> = Vec::new();
+    let mut hseq_list: Vec<ReportEntry> = Vec::new();
+    let mut it_list: Vec<ReportEntry> = Vec::new();
+    let mut learning_and_dev_list: Vec<ReportEntry> = Vec::new();
+    let mut wireline_list: Vec<ReportEntry> = Vec::new();
+    let mut meters_list: Vec<ReportEntry> = Vec::new();
+    let mut ops_list: Vec<ReportEntry> = Vec::new();
+    let mut production_list: Vec<ReportEntry> = Vec::new();
+    let mut supply_chain_list: Vec<ReportEntry> = Vec::new();
+    let mut welltest_list: Vec<ReportEntry> = Vec::new();
+    let mut trs_list: Vec<ReportEntry> = Vec::new();
+
+    for entry in res {
+        // report_date = entry.;
+
+        match entry.department.to_lowercase().trim() {
+            "area support" => {
+                admin_list.push(entry.clone());
+            }
+            "expro hmd base 1" => {
+                security_list.push(entry.clone());
+            }
+            "expro hmd base 2" => {
+                security_list.push(entry.clone());
+            }
+            "visitors" => {
+                visitors_list.push(entry.clone());
+            }
+            "bd" => {
+                bd_list.push(entry.clone());
+            }
+            "daq" => {
+                daq_list.push(entry.clone());
+            }
+            "dst" => {
+                dst_list.push(entry.clone());
+            }
+            "facilities" => {
+                facilities_list.push(entry.clone());
+            }
+            "finance" => {
+                finance_list.push(entry.clone());
+            }
+            "fluids" => {
+                fluids_list.push(entry.clone());
+            }
+            "hr" => {
+                hr_list.push(entry.clone());
+            }
+            "hseq" => {
+                hseq_list.push(entry.clone());
+            }
+            "qhse" => {
+                hseq_list.push(entry.clone());
+            }
+            "it" => {
+                it_list.push(entry.clone());
+            }
+            "l&d" => {
+                learning_and_dev_list.push(entry.clone());
+            }
+            "logging" => {
+                wireline_list.push(entry.clone());
+            }
+            "meters" => {
+                meters_list.push(entry.clone());
+            }
+            "production" => {
+                production_list.push(entry.clone());
+            }
+            "sampling" => {
+                daq_list.push(entry.clone());
+            }
+            "production operations" => {
+                ops_list.push(entry.clone());
+            }
+            "supply chain" => {
+                supply_chain_list.push(entry.clone());
+            }
+            "trs / wc" => {
+                trs_list.push(entry.clone());
+            }
+            "welltest" => {
+                welltest_list.push(entry.clone());
+            }
+            "wireline" => {
+                wireline_list.push(entry.clone());
+            }
+            _ => {}
+        }
+        if entry.meal == 0 {
+            breakfast_total += 1;
+            match entry.department.to_lowercase().trim() {
+                "area support" => {
+                    admin_count.breakfast += 1;
+                }
+                "expro hmd base 1" => {
+                    security.breakfast += 1;
+                }
+                "expro hmd base 2" => {
+                    security.breakfast += 1;
+                }
+                "visitors" => {
+                    visitors.breakfast += 1;
+                }
+                "bd" => {
+                    bd_count.breakfast += 1;
+                }
+                "daq" => {
+                    daq_count.breakfast += 1;
+                }
+                "dst" => {
+                    dst_count.breakfast += 1;
+                }
+                "facilities" => {
+                    facilities_count.breakfast += 1;
+                }
+                "finance" => {
+                    finance_count.breakfast += 1;
+                }
+                "fluids" => {
+                    lab_count.breakfast += 1;
+                }
+                "hr" => {
+                    hr_count.breakfast += 1;
+                }
+                "hseq" => {
+                    hseq_count.breakfast += 1;
+                }
+                "qhse" => {
+                    hseq_count.breakfast += 1;
+                }
+                "it" => {
+                    it_count.breakfast += 1;
+                }
+                "l&d" => {
+                    learning_and_dev.breakfast += 1;
+                }
+                "logging" => {
+                    wireline_count.breakfast += 1;
+                }
+                "meters" => {
+                    meters_count.breakfast += 1;
+                }
+                "production" => {
+                    production_count.breakfast += 1;
+                }
+                "sampling" => {
+                    daq_count.breakfast += 1;
+                }
+                "production operations" => {
+                    ops_count.breakfast += 1;
+                }
+                "supply chain" => {
+                    supply_chain_count.breakfast += 1;
+                }
+                "trs / wc" => {
+                    trs_count.breakfast += 1;
+                }
+                "welltest" => {
+                    welltest_count.breakfast += 1;
+                }
+                "wireline" => {
+                    wireline_count.breakfast += 1;
+                }
+                _ => {}
+            }
+        }
+        if entry.meal == 1 {
+            lunch_total += 1;
+
+            match entry.department.to_lowercase().trim() {
+                "area support" => {
+                    admin_count.lunch += 1;
+                }
+                "expro hmd base 1" => {
+                    security.lunch += 1;
+                }
+                "expro hmd base 2" => {
+                    security.lunch += 1;
+                }
+                "visitors" => {
+                    visitors.lunch += 1;
+                }
+                "bd" => {
+                    bd_count.lunch += 1;
+                }
+                "daq" => {
+                    daq_count.lunch += 1;
+                }
+                "dst" => {
+                    dst_count.lunch += 1;
+                }
+                "facilities" => {
+                    facilities_count.lunch += 1;
+                }
+                "finance" => {
+                    finance_count.lunch += 1;
+                }
+                "fluids" => {
+                    lab_count.lunch += 1;
+                }
+                "hr" => {
+                    hr_count.lunch += 1;
+                }
+                "hseq" => {
+                    hseq_count.lunch += 1;
+                }
+                "qhse" => {
+                    hseq_count.lunch += 1;
+                }
+                "it" => {
+                    it_count.lunch += 1;
+                }
+                "l&d" => {
+                    learning_and_dev.lunch += 1;
+                }
+                "logging" => {
+                    wireline_count.lunch += 1;
+                }
+                "meters" => {
+                    meters_count.lunch += 1;
+                }
+                "production" => {
+                    production_count.lunch += 1;
+                }
+                "sampling" => {
+                    daq_count.lunch += 1;
+                }
+                "production operations" => {
+                    ops_count.lunch += 1;
+                }
+                "supply chain" => {
+                    supply_chain_count.lunch += 1;
+                }
+                "trs / wc" => {
+                    trs_count.lunch += 1;
+                }
+                "welltest" => {
+                    welltest_count.lunch += 1;
+                }
+                "wireline" => {
+                    wireline_count.lunch += 1;
+                }
+                _ => {}
+            }
+        }
+        if entry.meal == 2 {
+            dinner_total += 1;
+
+            match entry.department.to_lowercase().trim() {
+                "area support" => {
+                    admin_count.dinner += 1;
+                }
+                "expro hmd base 1" => {
+                    security.dinner += 1;
+                }
+                "expro hmd base 2" => {
+                    security.dinner += 1;
+                }
+                "visitors" => {
+                    visitors.dinner += 1;
+                }
+                "bd" => {
+                    bd_count.dinner += 1;
+                }
+                "daq" => {
+                    daq_count.dinner += 1;
+                }
+                "dst" => {
+                    dst_count.dinner += 1;
+                }
+                "facilities" => {
+                    facilities_count.dinner += 1;
+                }
+                "finance" => {
+                    finance_count.dinner += 1;
+                }
+                "fluids" => {
+                    lab_count.dinner += 1;
+                }
+                "hr" => {
+                    hr_count.dinner += 1;
+                }
+                "hseq" => {
+                    hseq_count.dinner += 1;
+                }
+                "qhse" => {
+                    hseq_count.dinner += 1;
+                }
+                "it" => {
+                    it_count.dinner += 1;
+                }
+                "l&d" => {
+                    learning_and_dev.dinner += 1;
+                }
+                "logging" => {
+                    wireline_count.dinner += 1;
+                }
+                "meters" => {
+                    meters_count.dinner += 1;
+                }
+                "production" => {
+                    production_count.dinner += 1;
+                }
+                "sampling" => {
+                    daq_count.dinner += 1;
+                }
+                "production operations" => {
+                    ops_count.dinner += 1;
+                }
+                "supply chain" => {
+                    supply_chain_count.dinner += 1;
+                }
+                "trs / wc" => {
+                    trs_count.dinner += 1;
+                }
+                "welltest" => {
+                    welltest_count.dinner += 1;
+                }
+                "wireline" => {
+                    wireline_count.dinner += 1;
+                }
+                _ => {}
+            }
+        }
+        let typst_string = format!(
+            "\n[{}], [{}], [{}], [{}]",
+            entry.id,
+            entry
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            entry
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            entry.meal,
+        );
+        list_string.push_str(&typst_string);
+
+        let csv_str = format!(
+            "{},{},{},{},\n",
+            &entry.id, &entry.name, &entry.department, &entry.meal,
+        );
+        csv_string.push_str(&csv_str);
+    }
+
+    // First table
+
+    let mut template_str = r#"
+ 
+                            #set page(paper: "a4", margin: (
+                              top: 3cm,
+                                bottom: 3cm,
+                                  left: 2cm, 
+                                right: 2cm,
+                                              x: 1cm,
+                                                  ), header: context {
+                                                        [
+
+                                                                _Expro Canteen Report Ikram Base_
+                                                                    #h(1fr)
+                                                                        #counter(page).display()
+                                                                          ]
+                                                                          }, )
+
+
+                                                                          #set text(font: "Arial", size: 8pt)
+
+                                                                          // Medium bold table header.
+                                                                          #show table.cell.where(y: 0): set text(weight: "medium")
+
+                                                                          // Bold titles.
+
+                                                                          // See the strokes section for details on this!
+                                                                          #let frame(stroke) = (x, y) => (
+                                                                                left: if x > 0 { 0pt } else { stroke },
+                                                                                  right: stroke,
+                                                                                    top: if y < 2 { stroke } else { 0pt },
+                                                                                      bottom: stroke,
+                                                                                      )
+
+                                                                                      #set table(
+                                                                                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                                                                                              stroke: frame(rgb("21222C")),
+                                                                                              )
+
+                                                                                              #table(
+
+                                                                                                    columns: (1fr, 1fr, 1fr, 1fr),
+                                                                                                  table.header[Department][Breakfast][Lunch][Dinner],
+                                "#.to_owned();
+    template_str.push_str(
+        format!(
+            "[Area Support],[{}],[{}],[{}],\n",
+            admin_count.breakfast, admin_count.lunch, admin_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[BD],[{}],[{}],[{}],\n",
+            bd_count.breakfast, bd_count.lunch, bd_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[DAQ],[{}],[{}],[{}],\n",
+            daq_count.breakfast, daq_count.lunch, daq_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[DST],[{}],[{}],[{}],\n",
+            dst_count.breakfast, dst_count.lunch, dst_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Facilities],[{}],[{}],[{}],\n",
+            facilities_count.breakfast, facilities_count.lunch, facilities_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Finance],[{}],[{}],[{}],\n",
+            finance_count.breakfast, finance_count.lunch, finance_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Fluids],[{}],[{}],[{}],\n",
+            lab_count.breakfast, lab_count.lunch, lab_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[HR],[{}],[{}],[{}],\n",
+            hr_count.breakfast, hr_count.lunch, hr_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[QHSE],[{}],[{}],[{}],\n",
+            hseq_count.breakfast, hseq_count.lunch, hseq_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[IT],[{}],[{}],[{}],\n",
+            it_count.breakfast, it_count.lunch, it_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[L&D],[{}],[{}],[{}],\n",
+            learning_and_dev.breakfast, learning_and_dev.lunch, learning_and_dev.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Meters],[{}],[{}],[{}],\n",
+            meters_count.breakfast, meters_count.lunch, meters_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Production],[{}],[{}],[{}],\n",
+            production_count.breakfast, production_count.lunch, production_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[OPS],[{}],[{}],[{}],\n",
+            ops_count.breakfast, ops_count.lunch, ops_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Supply Chain],[{}],[{}],[{}],\n",
+            supply_chain_count.breakfast, supply_chain_count.lunch, supply_chain_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[TRS],[{}],[{}],[{}],\n",
+            trs_count.breakfast, trs_count.lunch, trs_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Welltest],[{}],[{}],[{}],\n",
+            welltest_count.breakfast, welltest_count.lunch, welltest_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Wireline],[{}],[{}],[{}],\n",
+            wireline_count.breakfast, wireline_count.lunch, wireline_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Security],[{}],[{}],[{}],\n",
+            security.breakfast, security.lunch, security.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        r#"
+          )
+        "#,
+    );
+
+    template_str.push_str(format!("Report start date: {}\n\n", start_date_string).as_str());
+    template_str.push_str(format!("Report end date: {}\n\n", end_date_string).as_str());
+    template_str.push_str(format!("Breakfast total: {}\n\n", breakfast_total).as_str());
+    template_str.push_str(format!("Lunch total: {}\n\n", lunch_total).as_str());
+    template_str.push_str(format!("Dinner total: {}\n\n", dinner_total).as_str());
+    template_str.push_str(
+        format!(
+            "Total Meals: {}\n\n",
+            dinner_total + lunch_total + breakfast_total
+        )
+        .as_str(),
+    );
+    // Second table.
+    template_str.push_str(
+        r#"
+            
+          // Medium bold table header.
+          #show table.cell.where(y: 0): set text(weight: "medium")
+
+          // Bold titles.
+
+          // See the strokes section for details on this!
+          #let frame(stroke) = (x, y) => (
+                left: if x > 0 { 0pt } else { stroke },
+                  right: stroke,
+                    top: if y < 2 { stroke } else { 0pt },
+                      bottom: stroke,
+                      )
+
+                      #set table(
+                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                              stroke: frame(rgb("21222C")),
+                              )
+
+                              #table(
+                                        columns: (1fr, 1fr, 1fr, 1fr),
+
+                                      table.header[ID][Name][Department][Meal],
+        "#,
+    );
+
+    // template_str.push_str(&list_string);
+    for employee in admin_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in security_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in visitors_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in bd_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in daq_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in dst_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in facilities_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in finance_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in fluids_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in hr_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in hseq_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in it_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in learning_and_dev_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in wireline_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in meters_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in ops_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in production_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in supply_chain_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in welltest_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+    for employee in trs_list {
+        let row_string = format!(
+            "\n[{}], [{}], [{}], [{}],",
+            employee.id,
+            employee
+                .name
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee
+                .department
+                .replace("'", "")
+                .replace("#", "")
+                .replace("%", "")
+                .replace("$", "")
+                .replace("\\", ""),
+            employee.meal,
+        );
+
+        template_str.push_str(&row_string);
+    }
+
+    template_str.push_str(
+        r#"
+          )
+        "#,
+    );
+
+    let mut file = std::fs::File::options()
+        .write(true)
+        .truncate(true)
+        .open("template.typ")?;
+    file.write_all(template_str.as_bytes())?;
+
+    let csv_date_str = datetime.naive_local().and_utc().format("%d_%m_%Y_%H_%M");
+    let report_file_name = format!("report_{}.csv", csv_date_str);
+    let mut csv_file = std::fs::File::options()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(report_file_name)?;
+    csv_file.write_all(csv_string.as_bytes())?;
+    let _compile_cmd = std::process::Command::new("cmd")
+        .args([
+            "/C",
+            format!(
+                "typst.exe compile template.typ C:\\Users\\Public\\Documents\\{}.pdf --open",
+                csv_date_str
+            )
+            .as_str(),
+        ])
+        .output()?;
+    // let _pdf_open_cmd = std::process::Command::new("cmd")
+    //     .args([
+    //         "/C",
+    //         format!(
+    //             "start  C:\\Users\\Public\\Documents\\CanteenReports\\{}.pdf",
+    //             csv_date_str
+    //         )
+    //         .as_str(),
+    //     ])
+    //     .output()?;
 
     Ok(())
 }

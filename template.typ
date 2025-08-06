@@ -9,7 +9,7 @@
                                                   ), header: context {
                                                         [
 
-                                                                _Expro Canteen Report_
+                                                                _Expro Canteen Report Ikram Base_
                                                                     #h(1fr)
                                                                         #counter(page).display()
                                                                           ]
@@ -42,35 +42,36 @@
                                                                                                   table.header[Department][Breakfast][Lunch][Dinner],
                                 [Area Support],[0],[0],[0],
 [BD],[0],[0],[0],
-[DAQ],[2],[1],[0],
+[DAQ],[0],[0],[1],
 [DST],[0],[0],[0],
 [Facilities],[0],[0],[0],
 [Finance],[0],[0],[0],
 [Fluids],[0],[0],[0],
 [HR],[0],[0],[0],
 [QHSE],[1],[0],[0],
-[IT],[1],[0],[0],
-[L&D],[1],[0],[0],
-[Wireline],[0],[0],[0],
+[IT],[0],[0],[0],
+[L&D],[0],[0],[0],
 [Meters],[0],[0],[0],
-[Production],[0],[0],[0],
+[Production],[3],[3],[1],
 [OPS],[0],[0],[0],
-[Supply Chain],[1],[0],[0],
-[TRS],[1],[0],[0],
-[Welltest],[5],[0],[0],
-[Wireline],[0],[0],[0],
+[Supply Chain],[0],[0],[0],
+[TRS],[0],[0],[0],
+[Welltest],[1],[1],[1],
+[Wireline],[1],[0],[0],
 [Security],[0],[0],[0],
 
           )
-        Report date: 12/06/2025
+        Report start date: 2025/03/06 00:00:00 +0000
 
-Breakfast total: 25
+Report end date: 2025/08/07 00:00:00 +0000
 
-Lunch total: 1
+Breakfast total: 6
 
-Dinner total: 0
+Lunch total: 4
 
-Total Meals: 26
+Dinner total: 3
+
+Total Meals: 13
 
 
             
@@ -93,34 +94,22 @@ Total Meals: 26
                               )
 
                               #table(
-                                        columns: (1fr, 1fr, 1fr, 0.5fr, 0.5fr, 0.5fr),
+                                        columns: (1fr, 1fr, 1fr, 1fr),
 
-                                      table.header[ID][Name][Department][Breakfast][Lunch][Dinner],
+                                      table.header[ID][Name][Department][Meal],
         
-[5008000308528], [BELLAKHDAR Abdeldjabar], [DAQ  ], [1], [0], [0],
-[5008000070791], [Ouabdelkader Nadir], [DAQ  ], [1], [1], [0],
-[500800026472], [ADAMOU  Ahmed Zakaria], [HSEQ], [1], [0], [0],
-[500800025380], [BENBEDJA  Salim], [IT], [1], [0], [0],
-[500800019198], [BELKACEMI  Kahina], [L&D], [1], [0], [0],
-[500800024811], [ABDELAIDOUM  Abdelhakim], [Production], [1], [0], [0],
-[5008000308300], [BELFAR Imadeddine], [Production], [1], [0], [0],
-[5008000308344], [BELFRIEKH Zakaria], [Production], [1], [0], [0],
-[5008000308413], [BELHADJ  Mohamed Sadek], [Production], [1], [0], [0],
-[5008000143333], [BELHAMRA   Yacine], [production], [1], [0], [0],
-[5008000308313], [BELHANNACHI Hicham], [Production], [1], [0], [0],
-[5008000308469], [BELKERCHA Houssem], [Production], [1], [0], [0],
-[5008000070993], [Belkessour Younes], [Production], [1], [0], [0],
-[5008000308381], [BELKHEIR  Hamza], [Production], [1], [0], [0],
-[5008000308304], [BELMANI Oussama], [Production], [1], [0], [0],
-[5008000308144], [BEN ABDALLAH Khaled], [Production], [1], [0], [0],
-[5008000308389], [BEN SEDDIK Mohammed El Haddi], [Production], [1], [0], [0],
-[5008000080791], [Zouari  Ferhat Hamza], [Production], [1], [0], [0],
-[5008000308166], [BELHADI Imad  ], [Supply Chain], [1], [0], [0],
-[500800020584], [ABOTRABA Mahmoud], [WellTest], [1], [0], [0],
-[500800014374], [AGGOUN  Fayçal ], [WellTest], [1], [0], [0],
-[50080000231194], [Bellouti Badreddine], [Welltest], [1], [0], [0],
-[50080000130290], [Belouidiane Djaber], [Welltest], [1], [0], [0],
-[5008000250659], [BENABDALLAH  Ahmed Abdelaziz], [WellTest], [1], [0], [0],
-[5008000308498], [BELKADI  Saadi], [TRS / WC], [1], [0], [0],
+[500800025140], [ABDOU  Abdelhalim], [Sampling], [2],
+[5008000300485], [Benamor Abdellah], [QHSE], [0],
+[5008000308509], [BENALLAL  Mohamed], [Wireline], [0],
+[5008000308389], [BEN SEDDIK Mohammed El Haddi], [Production], [0],
+[5008000308389], [BEN SEDDIK Mohammed El Haddi], [Production], [1],
+[5008000070993], [Belkessour Younes], [Production], [1],
+[500800011101992], [Abbes Faicel], [Production], [1],
+[5008000308217], [ABLA  Adlane], [Production], [2],
+[5008000308042], [BENAMMAR Ahmed Rami], [Production], [0],
+[5008000308220], [BENARIF Belkacem], [Production], [0],
+[50080000130290], [Belouidiane Djaber], [Welltest], [1],
+[5008000200991], [ABERKANE Hamid], [WellTest], [2],
+[5008000308421], [BENALI Gaya], [Welltest], [0],
           )
         
