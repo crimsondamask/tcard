@@ -2207,7 +2207,7 @@ fn reset_day(db_url: String) -> Result<()> {
     let _update_res = conn.exec_drop(
         format!(
             "UPDATE expro_employees
-                                SET ikram_breakfast=0, ikram_lunch=0, ikram_dinner=0;
+                                SET breakfast=0, lunch=0, dinner=0;
                                 ",
         ),
         (),
@@ -2223,7 +2223,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_ikram, ikram_breakfast, ikram_lunch, ikram_dinner, last_timestamp FROM expro_employees
+                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
                 WHERE id={};
             "#,
             app.input_result
@@ -2276,7 +2276,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET ikram_breakfast=1, last_timestamp={}
+                                SET breakfast=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2291,7 +2291,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 1,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2309,7 +2309,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET ikram_lunch=1, last_timestamp={}
+                                SET lunch=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2324,7 +2324,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 1,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2342,7 +2342,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET ikram_dinner=1, last_timestamp={}
+                                SET dinner=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2356,7 +2356,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 1,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2574,7 +2574,7 @@ fn generate_report_by_date(
         format!(
             r#"
                 SELECT id, name, department, title, meal FROM monthly
-                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=1;
+                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=0;
             "#,
         ),
         |(id, name, department, title, meal)| ReportEntry {
@@ -2967,7 +2967,7 @@ fn generate_report_by_date(
                                                   ), header: context {
                                                         [
 
-                                                                _Expro Canteen Report Ikram Base_
+                                                                _Expro Canteen Report Main Base_
                                                                     #h(1fr)
                                                                         #counter(page).display()
                                                                           ]
@@ -3133,6 +3133,13 @@ fn generate_report_by_date(
         .as_str(),
     );
     template_str.push_str(
+        format!(
+            "[Visitors],[{}],[{}],[{}],\n",
+            visitors.breakfast, visitors.lunch, visitors.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
         r#"
           )
         "#,
@@ -3181,462 +3188,1724 @@ fn generate_report_by_date(
 
     // template_str.push_str(&list_string);
     for employee in admin_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in security_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in visitors_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
-
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
         template_str.push_str(&row_string);
     }
     for employee in bd_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in daq_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in dst_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
-    for employee in facilities_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
 
+    for employee in facilities_list {
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
         template_str.push_str(&row_string);
     }
     for employee in finance_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in fluids_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
-
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
         template_str.push_str(&row_string);
     }
     for employee in hr_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in hseq_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in it_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in learning_and_dev_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
+
     for employee in wireline_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
-
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
         template_str.push_str(&row_string);
     }
+
     for employee in meters_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
+
     for employee in ops_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
+
     for employee in production_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
     for employee in supply_chain_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }
+
     for employee in welltest_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
-
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
         template_str.push_str(&row_string);
     }
+
     for employee in trs_list {
-        let row_string = format!(
-            "\n[{}], [{}], [{}], [{}],",
-            employee.id,
-            employee
-                .name
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee
-                .department
-                .replace("'", "")
-                .replace("#", "")
-                .replace("%", "")
-                .replace("$", "")
-                .replace("\\", ""),
-            employee.meal,
-        );
+        let row_string = match employee.meal {
+            0 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Breakfast],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            1 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Lunch],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            2 => {
+                format!(
+                    "\n[{}], [{}], [{}], [Dinner],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+            _ => {
+                format!(
+                    "\n[{}], [{}], [{}], [N/A],",
+                    employee.id,
+                    employee
+                        .name
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                    employee
+                        .department
+                        .replace("'", "")
+                        .replace("#", "")
+                        .replace("%", "")
+                        .replace("$", "")
+                        .replace("\\", ""),
+                )
+            }
+        };
 
         template_str.push_str(&row_string);
     }

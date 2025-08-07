@@ -18,7 +18,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Expro Canteen Control IKRAM BASE",
+        "Expro Canteen Control MAIN BASE",
         native_options,
         Box::new(|cc| Ok(Box::new(expro_canteen::TemplateApp::new(cc)))),
     )
