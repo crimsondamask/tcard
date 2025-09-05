@@ -1023,8 +1023,8 @@ fn generate_day_report(db_url: String) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_ikram, ikram_breakfast, ikram_lunch, ikram_dinner, last_timestamp FROM expro_employees
-                WHERE ikram_breakfast=1 OR ikram_lunch=1 OR ikram_dinner=1;
+                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
+                WHERE breakfast=1 OR lunch=1 OR dinner=1;
             "#,
             ),
             |(id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp)| {
@@ -1433,7 +1433,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
                                                   ), header: context {
                                                         [
 
-                                                                _Expro Canteen Report Ikram Base_
+                                                                _Expro Canteen Report Main Base_
                                                                     #h(1fr)
                                                                         #counter(page).display()
                                                                           ]
@@ -1448,168 +1448,168 @@ fn generate_day_report(db_url: String) -> Result<()> {
                                                                           // Bold titles.
 
                                                                           // See the strokes section for details on this!
-                                                                          #let frame(stroke) = (x, y) => (
-                                                                                left: if x > 0 { 0pt } else { stroke },
-                                                                                  right: stroke,
-                                                                                    top: if y < 2 { stroke } else { 0pt },
-                                                                                      bottom: stroke,
-                                                                                      )
+                                                                          // #let frame(stroke) = (x, y) => (
+                                                                          //       left: if x > 0 { 0pt } else { stroke },
+                                                                          //         right: stroke,
+                                                                          //           top: if y < 2 { stroke } else { 0pt },
+                                                                          //             bottom: stroke,
+                                                                          //             )
 
-                                                                                      #set table(
-                                                                                            fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
-                                                                                              stroke: frame(rgb("21222C")),
-                                                                                              )
+                                                                          //             #set table(
+                                                                          //                   fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                                                                          //                     stroke: frame(rgb("21222C")),
+                                                                          //                     )
 
-                                                                                              #table(
+                                                                          //                     #table(
 
-                                                                                                    columns: (1fr, 1fr, 1fr, 1fr),
-                                                                                                  table.header[Department][Breakfast][Lunch][Dinner],
+                                                                          //                           columns: (1fr, 1fr, 1fr, 1fr),
+                                                                          //                         table.header[Department][Breakfast][Lunch][Dinner],
                                 "#.to_owned();
-    template_str.push_str(
-        format!(
-            "[Area Support],[{}],[{}],[{}],\n",
-            admin_count.breakfast, admin_count.lunch, admin_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[BD],[{}],[{}],[{}],\n",
-            bd_count.breakfast, bd_count.lunch, bd_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[DAQ],[{}],[{}],[{}],\n",
-            daq_count.breakfast, daq_count.lunch, daq_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[DST],[{}],[{}],[{}],\n",
-            dst_count.breakfast, dst_count.lunch, dst_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Facilities],[{}],[{}],[{}],\n",
-            facilities_count.breakfast, facilities_count.lunch, facilities_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Finance],[{}],[{}],[{}],\n",
-            finance_count.breakfast, finance_count.lunch, finance_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Fluids],[{}],[{}],[{}],\n",
-            lab_count.breakfast, lab_count.lunch, lab_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[HR],[{}],[{}],[{}],\n",
-            hr_count.breakfast, hr_count.lunch, hr_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[QHSE],[{}],[{}],[{}],\n",
-            hseq_count.breakfast, hseq_count.lunch, hseq_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[IT],[{}],[{}],[{}],\n",
-            it_count.breakfast, it_count.lunch, it_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[L&D],[{}],[{}],[{}],\n",
-            learning_and_dev.breakfast, learning_and_dev.lunch, learning_and_dev.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Wireline],[{}],[{}],[{}],\n",
-            wireline_count.breakfast, wireline_count.lunch, wireline_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Meters],[{}],[{}],[{}],\n",
-            meters_count.breakfast, meters_count.lunch, meters_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Production],[{}],[{}],[{}],\n",
-            production_count.breakfast, production_count.lunch, production_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[OPS],[{}],[{}],[{}],\n",
-            ops_count.breakfast, ops_count.lunch, ops_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Supply Chain],[{}],[{}],[{}],\n",
-            supply_chain_count.breakfast, supply_chain_count.lunch, supply_chain_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[TRS],[{}],[{}],[{}],\n",
-            trs_count.breakfast, trs_count.lunch, trs_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Welltest],[{}],[{}],[{}],\n",
-            welltest_count.breakfast, welltest_count.lunch, welltest_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Wireline],[{}],[{}],[{}],\n",
-            wireline_count.breakfast, wireline_count.lunch, wireline_count.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        format!(
-            "[Security],[{}],[{}],[{}],\n",
-            security.breakfast, security.lunch, security.dinner
-        )
-        .as_str(),
-    );
-    template_str.push_str(
-        r#"
-          )
-        "#,
-    );
+    // template_str.push_str(
+    //     format!(
+    //         "[Area Support],[{}],[{}],[{}],\n",
+    //         admin_count.breakfast, admin_count.lunch, admin_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[BD],[{}],[{}],[{}],\n",
+    //         bd_count.breakfast, bd_count.lunch, bd_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[DAQ],[{}],[{}],[{}],\n",
+    //         daq_count.breakfast, daq_count.lunch, daq_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[DST],[{}],[{}],[{}],\n",
+    //         dst_count.breakfast, dst_count.lunch, dst_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Facilities],[{}],[{}],[{}],\n",
+    //         facilities_count.breakfast, facilities_count.lunch, facilities_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Finance],[{}],[{}],[{}],\n",
+    //         finance_count.breakfast, finance_count.lunch, finance_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Fluids],[{}],[{}],[{}],\n",
+    //         lab_count.breakfast, lab_count.lunch, lab_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[HR],[{}],[{}],[{}],\n",
+    //         hr_count.breakfast, hr_count.lunch, hr_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[QHSE],[{}],[{}],[{}],\n",
+    //         hseq_count.breakfast, hseq_count.lunch, hseq_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[IT],[{}],[{}],[{}],\n",
+    //         it_count.breakfast, it_count.lunch, it_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[L&D],[{}],[{}],[{}],\n",
+    //         learning_and_dev.breakfast, learning_and_dev.lunch, learning_and_dev.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Meters],[{}],[{}],[{}],\n",
+    //         meters_count.breakfast, meters_count.lunch, meters_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Production],[{}],[{}],[{}],\n",
+    //         production_count.breakfast, production_count.lunch, production_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[OPS],[{}],[{}],[{}],\n",
+    //         ops_count.breakfast, ops_count.lunch, ops_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Supply Chain],[{}],[{}],[{}],\n",
+    //         supply_chain_count.breakfast, supply_chain_count.lunch, supply_chain_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[TRS],[{}],[{}],[{}],\n",
+    //         trs_count.breakfast, trs_count.lunch, trs_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Welltest],[{}],[{}],[{}],\n",
+    //         welltest_count.breakfast, welltest_count.lunch, welltest_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Wireline],[{}],[{}],[{}],\n",
+    //         wireline_count.breakfast, wireline_count.lunch, wireline_count.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Security],[{}],[{}],[{}],\n",
+    //         security.breakfast, security.lunch, security.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     format!(
+    //         "[Visitors],[{}],[{}],[{}],\n",
+    //         visitors.breakfast, visitors.lunch, visitors.dinner
+    //     )
+    //     .as_str(),
+    // );
+    // template_str.push_str(
+    //     r#"
+    //       )
+    //     "#,
+    // );
 
     if let Some(date_time_report) = DateTime::from_timestamp(report_date as i64, 0) {
         template_str
@@ -2207,7 +2207,7 @@ fn reset_day(db_url: String) -> Result<()> {
     let _update_res = conn.exec_drop(
         format!(
             "UPDATE expro_employees
-                                SET breakfast=0, lunch=0, dinner=0;
+                                SET ikram_breakfast=0, ikram_lunch=0, ikram_dinner=0;
                                 ",
         ),
         (),
@@ -2223,7 +2223,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
+                SELECT id, name, department, title, expro_id, field, category, in_ikram, ikram_breakfast, ikram_lunch, ikram_dinner, last_timestamp FROM expro_employees
                 WHERE id={};
             "#,
             app.input_result
@@ -2266,17 +2266,12 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
             match app.meal {
                 Meal::Breakfast => {
                     if (employee_query_result.breakfast == 0)
-                        && (employee_query_result.department.to_lowercase() != "expro hmd 1")
-                        && (employee_query_result.department.to_lowercase() != "expro hmd 2")
-                        && (employee_query_result.department.to_lowercase() != "ikram base")
-                        && (employee_query_result.department.to_lowercase() != "kamato")
-                        && (employee_query_result.department.to_lowercase() != "fca")
                         && (employee_query_result.in_base != 0)
                     {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET breakfast=1, last_timestamp={}
+                                SET ikram_breakfast=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2291,25 +2286,18 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 0,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 1,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
                     }
                 }
                 Meal::Lunch => {
-                    if (employee_query_result.lunch == 0)
-                        && (employee_query_result.department.to_lowercase() != "expro hmd 1")
-                        && (employee_query_result.department.to_lowercase() != "expro hmd 2")
-                        && (employee_query_result.department.to_lowercase() != "ikram base")
-                        && (employee_query_result.department.to_lowercase() != "kamato")
-                        && (employee_query_result.department.to_lowercase() != "fca")
-                        && (employee_query_result.in_base != 0)
-                    {
+                    if (employee_query_result.lunch == 0) && (employee_query_result.in_base != 0) {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET lunch=1, last_timestamp={}
+                                SET ikram_lunch=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2324,25 +2312,18 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 0,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 1,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
                     }
                 }
                 Meal::Dinner => {
-                    if (employee_query_result.dinner == 0)
-                        && (employee_query_result.department.to_lowercase() != "expro hmd 1")
-                        && (employee_query_result.department.to_lowercase() != "expro hmd 2")
-                        && (employee_query_result.department.to_lowercase() != "ikram base")
-                        && (employee_query_result.department.to_lowercase() != "kamato")
-                        && (employee_query_result.department.to_lowercase() != "fca")
-                        && (employee_query_result.in_base != 0)
-                    {
+                    if (employee_query_result.dinner == 0) && (employee_query_result.in_base != 0) {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET dinner=1, last_timestamp={}
+                                SET ikram_dinner=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2356,7 +2337,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 0,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 1,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2574,7 +2555,7 @@ fn generate_report_by_date(
         format!(
             r#"
                 SELECT id, name, department, title, meal FROM monthly
-                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=0;
+                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=1;
             "#,
         ),
         |(id, name, department, title, meal)| ReportEntry {
@@ -2967,7 +2948,7 @@ fn generate_report_by_date(
                                                   ), header: context {
                                                         [
 
-                                                                _Expro Canteen Report Main Base_
+                                                                _Expro Canteen Report Ikram Base_
                                                                     #h(1fr)
                                                                         #counter(page).display()
                                                                           ]
