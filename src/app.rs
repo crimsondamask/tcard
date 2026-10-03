@@ -342,17 +342,17 @@ impl eframe::App for TemplateApp {
                             self.employee_buffer.clear();
                         }
                         ui.end_row();
-                        ui.label("Start Date:");
-                        ui.text_edit_singleline(&mut self.start_date_for_report);
-                        ui.end_row();
-                        ui.label("End Date:");
-                        ui.text_edit_singleline(&mut self.end_date_for_report);
-                        ui.end_row();
+                        // ui.label("Start Date:");
+                        // ui.text_edit_singleline(&mut self.start_date_for_report);
+                        // ui.end_row();
+                        // ui.label("End Date:");
+                        // ui.text_edit_singleline(&mut self.end_date_for_report);
+                        // ui.end_row();
                         if ui.button("Generate Report").clicked() {
-                            match generate_report_by_date(
+                            match generate_day_report(
                                 self.db_url.clone(),
-                                self.start_date_for_report.clone(),
-                                self.end_date_for_report.clone(),
+                                // self.start_date_for_report.clone(),
+                                // self.end_date_for_report.clone(),
                             ) {
                                 Ok(_) => {
                                     self.id_check.is_error = false;
@@ -370,11 +370,7 @@ impl eframe::App for TemplateApp {
                         .add(egui::Button::new("RESET DAY COUNT").fill(Color32::RED))
                         .clicked()
                     {
-                        match generate_report_by_date(
-                            self.db_url.clone(),
-                            self.start_date_for_report.clone(),
-                            self.end_date_for_report.clone(),
-                        ) {
+                        match generate_day_report(self.db_url.clone()) {
                             Ok(_) => {
                                 self.id_check.is_error = false;
                                 self.id_check.err_msg = "".to_owned();
@@ -811,11 +807,11 @@ fn generate_report(app: &mut TemplateApp) -> Result<()> {
     let datetime = chrono::Local::now();
     let date_str = datetime.naive_local().and_utc().format("%d-%m-%Y %H:%M");
     let mut template_str = r#"
- 
+
                             #set page(paper: "a4", margin: (
                               top: 3cm,
                                 bottom: 3cm,
-                                  left: 2cm, 
+                                  left: 2cm,
                                 right: 2cm,
                                               x: 1cm,
                                                   ), header: context {
@@ -924,11 +920,6 @@ fn generate_day_report(db_url: String) -> Result<()> {
         lunch: 0,
         dinner: 0,
     };
-    let mut visitors = DepartmentCount {
-        breakfast: 0,
-        lunch: 0,
-        dinner: 0,
-    };
     let mut daq_count = DepartmentCount {
         breakfast: 0,
         lunch: 0,
@@ -944,7 +935,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
         lunch: 0,
         dinner: 0,
     };
-    let mut mpp_count = DepartmentCount {
+    let mut visitors_count = DepartmentCount {
         breakfast: 0,
         lunch: 0,
         dinner: 0,
@@ -1052,7 +1043,6 @@ fn generate_day_report(db_url: String) -> Result<()> {
 
     let mut admin_list: Vec<Employee> = Vec::new();
     let mut security_list: Vec<Employee> = Vec::new();
-    let mut visitors_list: Vec<Employee> = Vec::new();
     let mut bd_list: Vec<Employee> = Vec::new();
     let mut daq_list: Vec<Employee> = Vec::new();
     let mut dst_list: Vec<Employee> = Vec::new();
@@ -1070,6 +1060,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
     let mut supply_chain_list: Vec<Employee> = Vec::new();
     let mut welltest_list: Vec<Employee> = Vec::new();
     let mut trs_list: Vec<Employee> = Vec::new();
+    let mut visitors_list: Vec<Employee> = Vec::new();
 
     for entry in res {
         report_date = entry.last_timestamp;
@@ -1084,7 +1075,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
             "expro hmd base 2" => {
                 security_list.push(entry.clone());
             }
-            "visitors" => {
+            "visitor" => {
                 visitors_list.push(entry.clone());
             }
             "bd" => {
@@ -1161,8 +1152,8 @@ fn generate_day_report(db_url: String) -> Result<()> {
                 "expro hmd base 2" => {
                     security.breakfast += 1;
                 }
-                "visitors" => {
-                    visitors.breakfast += 1;
+                "visitor" => {
+                    visitors_count.breakfast += 1;
                 }
                 "bd" => {
                     bd_count.breakfast += 1;
@@ -1240,8 +1231,8 @@ fn generate_day_report(db_url: String) -> Result<()> {
                 "expro hmd base 2" => {
                     security.lunch += 1;
                 }
-                "visitors" => {
-                    visitors.lunch += 1;
+                "visitor" => {
+                    visitors_count.lunch += 1;
                 }
                 "bd" => {
                     bd_count.lunch += 1;
@@ -1319,8 +1310,8 @@ fn generate_day_report(db_url: String) -> Result<()> {
                 "expro hmd base 2" => {
                     security.dinner += 1;
                 }
-                "visitors" => {
-                    visitors.dinner += 1;
+                "visitor" => {
+                    visitors_count.dinner += 1;
                 }
                 "bd" => {
                     bd_count.dinner += 1;
@@ -1423,11 +1414,11 @@ fn generate_day_report(db_url: String) -> Result<()> {
     // First table
 
     let mut template_str = r#"
- 
+
                             #set page(paper: "a4", margin: (
                               top: 3cm,
                                 bottom: 3cm,
-                                  left: 2cm, 
+                                  left: 2cm,
                                 right: 2cm,
                                               x: 1cm,
                                                   ), header: context {
@@ -1448,168 +1439,168 @@ fn generate_day_report(db_url: String) -> Result<()> {
                                                                           // Bold titles.
 
                                                                           // See the strokes section for details on this!
-                                                                          // #let frame(stroke) = (x, y) => (
-                                                                          //       left: if x > 0 { 0pt } else { stroke },
-                                                                          //         right: stroke,
-                                                                          //           top: if y < 2 { stroke } else { 0pt },
-                                                                          //             bottom: stroke,
-                                                                          //             )
+                                                                           #let frame(stroke) = (x, y) => (
+                                                                                 left: if x > 0 { 0pt } else { stroke },
+                                                                                   right: stroke,
+                                                                                     top: if y < 2 { stroke } else { 0pt },
+                                                                                       bottom: stroke,
+                                                                                       )
 
-                                                                          //             #set table(
-                                                                          //                   fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
-                                                                          //                     stroke: frame(rgb("21222C")),
-                                                                          //                     )
+                                                                                       #set table(
+                                                                                             fill: (_, y) => if calc.odd(y) { rgb("EAF2F5") },
+                                                                                               stroke: frame(rgb("21222C")),
+                                                                                               )
 
-                                                                          //                     #table(
+                                                                                               #table(
 
-                                                                          //                           columns: (1fr, 1fr, 1fr, 1fr),
-                                                                          //                         table.header[Department][Breakfast][Lunch][Dinner],
+                                                                                                     columns: (1fr, 1fr, 1fr, 1fr),
+                                                                                                   table.header[Department][Breakfast][Lunch][Dinner],
                                 "#.to_owned();
-    // template_str.push_str(
-    //     format!(
-    //         "[Area Support],[{}],[{}],[{}],\n",
-    //         admin_count.breakfast, admin_count.lunch, admin_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[BD],[{}],[{}],[{}],\n",
-    //         bd_count.breakfast, bd_count.lunch, bd_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[DAQ],[{}],[{}],[{}],\n",
-    //         daq_count.breakfast, daq_count.lunch, daq_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[DST],[{}],[{}],[{}],\n",
-    //         dst_count.breakfast, dst_count.lunch, dst_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Facilities],[{}],[{}],[{}],\n",
-    //         facilities_count.breakfast, facilities_count.lunch, facilities_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Finance],[{}],[{}],[{}],\n",
-    //         finance_count.breakfast, finance_count.lunch, finance_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Fluids],[{}],[{}],[{}],\n",
-    //         lab_count.breakfast, lab_count.lunch, lab_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[HR],[{}],[{}],[{}],\n",
-    //         hr_count.breakfast, hr_count.lunch, hr_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[QHSE],[{}],[{}],[{}],\n",
-    //         hseq_count.breakfast, hseq_count.lunch, hseq_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[IT],[{}],[{}],[{}],\n",
-    //         it_count.breakfast, it_count.lunch, it_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[L&D],[{}],[{}],[{}],\n",
-    //         learning_and_dev.breakfast, learning_and_dev.lunch, learning_and_dev.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Meters],[{}],[{}],[{}],\n",
-    //         meters_count.breakfast, meters_count.lunch, meters_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Production],[{}],[{}],[{}],\n",
-    //         production_count.breakfast, production_count.lunch, production_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[OPS],[{}],[{}],[{}],\n",
-    //         ops_count.breakfast, ops_count.lunch, ops_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Supply Chain],[{}],[{}],[{}],\n",
-    //         supply_chain_count.breakfast, supply_chain_count.lunch, supply_chain_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[TRS],[{}],[{}],[{}],\n",
-    //         trs_count.breakfast, trs_count.lunch, trs_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Welltest],[{}],[{}],[{}],\n",
-    //         welltest_count.breakfast, welltest_count.lunch, welltest_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Wireline],[{}],[{}],[{}],\n",
-    //         wireline_count.breakfast, wireline_count.lunch, wireline_count.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Security],[{}],[{}],[{}],\n",
-    //         security.breakfast, security.lunch, security.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     format!(
-    //         "[Visitors],[{}],[{}],[{}],\n",
-    //         visitors.breakfast, visitors.lunch, visitors.dinner
-    //     )
-    //     .as_str(),
-    // );
-    // template_str.push_str(
-    //     r#"
-    //       )
-    //     "#,
-    // );
+    template_str.push_str(
+        format!(
+            "[Area Support],[{}],[{}],[{}],\n",
+            admin_count.breakfast, admin_count.lunch, admin_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[BD],[{}],[{}],[{}],\n",
+            bd_count.breakfast, bd_count.lunch, bd_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[DAQ],[{}],[{}],[{}],\n",
+            daq_count.breakfast, daq_count.lunch, daq_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[DST],[{}],[{}],[{}],\n",
+            dst_count.breakfast, dst_count.lunch, dst_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Facilities],[{}],[{}],[{}],\n",
+            facilities_count.breakfast, facilities_count.lunch, facilities_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Finance],[{}],[{}],[{}],\n",
+            finance_count.breakfast, finance_count.lunch, finance_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Fluids],[{}],[{}],[{}],\n",
+            lab_count.breakfast, lab_count.lunch, lab_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[HR],[{}],[{}],[{}],\n",
+            hr_count.breakfast, hr_count.lunch, hr_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[QHSE],[{}],[{}],[{}],\n",
+            hseq_count.breakfast, hseq_count.lunch, hseq_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[IT],[{}],[{}],[{}],\n",
+            it_count.breakfast, it_count.lunch, it_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[L&D],[{}],[{}],[{}],\n",
+            learning_and_dev.breakfast, learning_and_dev.lunch, learning_and_dev.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Meters],[{}],[{}],[{}],\n",
+            meters_count.breakfast, meters_count.lunch, meters_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Production],[{}],[{}],[{}],\n",
+            production_count.breakfast, production_count.lunch, production_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[OPS],[{}],[{}],[{}],\n",
+            ops_count.breakfast, ops_count.lunch, ops_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Supply Chain],[{}],[{}],[{}],\n",
+            supply_chain_count.breakfast, supply_chain_count.lunch, supply_chain_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[TRS],[{}],[{}],[{}],\n",
+            trs_count.breakfast, trs_count.lunch, trs_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Welltest],[{}],[{}],[{}],\n",
+            welltest_count.breakfast, welltest_count.lunch, welltest_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Wireline],[{}],[{}],[{}],\n",
+            wireline_count.breakfast, wireline_count.lunch, wireline_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Security],[{}],[{}],[{}],\n",
+            security.breakfast, security.lunch, security.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        format!(
+            "[Visitors],[{}],[{}],[{}],\n",
+            visitors_count.breakfast, visitors_count.lunch, visitors_count.dinner
+        )
+        .as_str(),
+    );
+    template_str.push_str(
+        r#"
+          )
+        "#,
+    );
 
     if let Some(date_time_report) = DateTime::from_timestamp(report_date as i64, 0) {
         template_str
@@ -1628,7 +1619,7 @@ fn generate_day_report(db_url: String) -> Result<()> {
     // Second table.
     template_str.push_str(
         r#"
-            
+
           // Medium bold table header.
           #show table.cell.where(y: 0): set text(weight: "medium")
 
@@ -2207,7 +2198,7 @@ fn reset_day(db_url: String) -> Result<()> {
     let _update_res = conn.exec_drop(
         format!(
             "UPDATE expro_employees
-                                SET ikram_breakfast=0, ikram_lunch=0, ikram_dinner=0;
+                                SET breakfast=0, lunch=0, dinner=0;
                                 ",
         ),
         (),
@@ -2223,7 +2214,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
     let res = conn.query_map(
             format!(
             r#"
-                SELECT id, name, department, title, expro_id, field, category, in_ikram, ikram_breakfast, ikram_lunch, ikram_dinner, last_timestamp FROM expro_employees
+                SELECT id, name, department, title, expro_id, field, category, in_base, breakfast, lunch, dinner, last_timestamp FROM expro_employees
                 WHERE id={};
             "#,
             app.input_result
@@ -2271,7 +2262,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET ikram_breakfast=1, last_timestamp={}
+                                SET breakfast=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2286,7 +2277,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 1,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, BREAKFAST, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2297,7 +2288,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET ikram_lunch=1, last_timestamp={}
+                                SET lunch=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2312,7 +2303,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 1,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, LUNCH, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2323,7 +2314,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                         let _update_res = conn.exec_drop(
                             format!(
                                 "UPDATE expro_employees
-                                SET ikram_dinner=1, last_timestamp={}
+                                SET dinner=1, last_timestamp={}
                                 WHERE id={}",
                                 timestamp, employee_query_result.id
                             ),
@@ -2337,7 +2328,7 @@ fn process_id(app: &mut TemplateApp) -> Result<()> {
                             "INSERT INTO main_db.monthly (id, name, department, title, meal, timestamp, base)
                              VALUES(?, ?, ?, ?, ?, ?, ?);",
                             ),
-                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 1,))?;
+                            (employee_query_result.id, employee_query_result.name, employee_query_result.department, employee_query_result.title, DINNER, timestamp, 0,))?;
                     } else {
                         play_error_sound()?;
                         return Err(anyhow!("ID has already been scanned."));
@@ -2555,7 +2546,7 @@ fn generate_report_by_date(
         format!(
             r#"
                 SELECT id, name, department, title, meal FROM monthly
-                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=1;
+                WHERE (timestamp BETWEEN {start_timestamp} AND {end_timestamp}) AND base=0;
             "#,
         ),
         |(id, name, department, title, meal)| ReportEntry {
@@ -2938,11 +2929,11 @@ fn generate_report_by_date(
     // First table
 
     let mut template_str = r#"
- 
+
                             #set page(paper: "a4", margin: (
                               top: 3cm,
                                 bottom: 3cm,
-                                  left: 2cm, 
+                                  left: 2cm,
                                 right: 2cm,
                                               x: 1cm,
                                                   ), header: context {
@@ -3141,7 +3132,7 @@ fn generate_report_by_date(
     // Second table.
     template_str.push_str(
         r#"
-            
+
           // Medium bold table header.
           #show table.cell.where(y: 0): set text(weight: "medium")
 
